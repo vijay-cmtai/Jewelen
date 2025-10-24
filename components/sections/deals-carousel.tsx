@@ -34,12 +34,12 @@ export default function DealsCarousel() {
 
   useEffect(() => {
     if (allProducts.length > 0) {
-      // Step 1: Pehle "Deals" (sale wale products) dhoondhne ki koshish karein
+      // Step 1: Filter products with deals (products on sale)
       let filteredItems = allProducts.filter(
         (p) => p.originalPrice && p.originalPrice > p.price
       );
 
-      // Step 2: Agar koi "Deal" nahi milti hai, toh saare products ko fallback ke taur par le lein
+      // Step 2: If no deals found, show all products as fallback
       if (filteredItems.length === 0) {
         console.log(
           "No specific deals found. Showing latest products as fallback."
@@ -47,7 +47,7 @@ export default function DealsCarousel() {
         filteredItems = allProducts;
       }
 
-      // Step 3: Sirf pehle 8 items dikhayein
+      // Step 3: Show only first 8 items
       setItemsToShow(filteredItems.slice(0, 8));
     }
   }, [allProducts]);
@@ -64,7 +64,7 @@ export default function DealsCarousel() {
     );
   }
 
-  // Ab yeh tabhi null return karega jab backend se koi bhi product na aaye
+  // Return null only when no products are available from backend
   if (itemsToShow.length === 0) {
     return null;
   }
@@ -107,7 +107,7 @@ export default function DealsCarousel() {
 
       <div
         ref={rail}
-        className="flex gap-6 overflow-x-auto snap-x snap-mandatory pb-4 scrollbar-hide"
+        className="flex gap-6 overflow-x-auto snap-x snap-mandatory pb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
       >
         {itemsToShow.map((product) => {
           const discount = product.originalPrice
