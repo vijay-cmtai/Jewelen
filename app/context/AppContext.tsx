@@ -38,32 +38,62 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const { items: allProducts } = useSelector(
     (state: RootState) => state.jewelry
   );
+  const { userInfo } = useSelector((state: RootState) => state.user);
 
   const addToCart = useCallback(
-    (productId: string, quantity: number = 1) => {
-      dispatch(addToCartAction({ productId, quantity }));
-      alert("Product added to cart!");
+    async (productId: string, quantity: number = 1) => {
+      if (!userInfo || !userInfo.token) {
+        alert("Please login first to add items to cart!");
+        return;
+      }
+      
+      try {
+        await dispatch(addToCartAction({ productId, quantity })).unwrap();
+        alert("Product added to cart!");
+      } catch (error: any) {
+        console.error("Add to cart error:", error);
+        alert(error || "Failed to add to cart. Please try again.");
+      }
     },
-    [dispatch]
+    [dispatch, userInfo]
   );
 
   const removeFromCart = useCallback(
-    (productId: string) => {
-      dispatch(removeFromCartAction({ productId }));
+    async (productId: string) => {
+      if (!userInfo || !userInfo.token) {
+        alert("Please login first!");
+        return;
+      }
+      
+      try {
+        await dispatch(removeFromCartAction({ productId })).unwrap();
+      } catch (error: any) {
+        console.error("Remove from cart error:", error);
+        alert(error || "Failed to remove from cart.");
+      }
     },
-    [dispatch]
+    [dispatch, userInfo]
   );
 
   const updateQuantity = useCallback(
-    (productId: string, quantity: number) => {
-      if (quantity >= 1) {
-        dispatch(updateCartQuantityAction({ productId, quantity }));
-      } else {
-        // Agar quantity 0 ya usse kam ho jaye, toh item ko cart se remove kar do
-        dispatch(removeFromCartAction({ productId }));
+    async (productId: string, quantity: number) => {
+      if (!userInfo || !userInfo.token) {
+        alert("Please login first!");
+        return;
+      }
+      
+      try {
+        if (quantity >= 1) {
+          await dispatch(updateCartQuantityAction({ productId, quantity })).unwrap();
+        } else {
+          await dispatch(removeFromCartAction({ productId })).unwrap();
+        }
+      } catch (error: any) {
+        console.error("Update quantity error:", error);
+        alert(error || "Failed to update quantity.");
       }
     },
-    [dispatch]
+    [dispatch, userInfo]
   );
 
   const isItemInWishlist = useCallback(
@@ -74,26 +104,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const addToWishlist = useCallback(
-    (productId: string) => {
+    async (productId: string) => {
+      if (!userInfo || !userInfo.token) {
+        alert("Please login first to add items to wishlist!");
+        return;
+      }
+
       const productToAdd = allProducts.find((p) => p._id === productId);
-      if (productToAdd) {
+      if (!productToAdd) {
+        alert("Product not found!");
+        return;
+      }
+
+      try {
         if (isItemInWishlist(productId)) {
-          dispatch(removeFromWishlistAction({ diamondId: productId }));
+          await dispatch(removeFromWishlistAction({ diamondId: productId })).unwrap();
           alert("Removed from wishlist!");
         } else {
-          dispatch(addToWishlistAction(productToAdd as any));
+          await dispatch(addToWishlistAction(productToAdd as any)).unwrap();
           alert("Added to wishlist!");
         }
+      } catch (error: any) {
+        console.error("Wishlist error:", error);
+        alert(error || "Failed to update wishlist. Please try again.");
       }
     },
-    [dispatch, allProducts, isItemInWishlist]
+    [dispatch, allProducts, isItemInWishlist, userInfo]
   );
 
   const removeFromWishlist = useCallback(
-    (productId: string) => {
-      dispatch(removeFromWishlistAction({ diamondId: productId }));
+    async (productId: string) => {
+      if (!userInfo || !userInfo.token) {
+        alert("Please login first!");
+        return;
+      }
+      
+      try {
+        await dispatch(removeFromWishlistAction({ diamondId: productId })).unwrap();
+      } catch (error: any) {
+        console.error("Remove from wishlist error:", error);
+        alert(error || "Failed to remove from wishlist.");
+      }
     },
-    [dispatch]
+    [dispatch, userInfo]
   );
 
   const clearCart = useCallback(() => {
