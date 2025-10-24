@@ -1,60 +1,96 @@
 "use client";
 
-import { useState } from "react";
-import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  AlertCircle,
-  CheckCircle,
-} from "lucide-react";
+import { Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { toast } from "react-toastify";
+import { useSelector, useDispatch } from "react-redux";
+import { loginUser, resetActionStatus } from "@/lib/features/users/userSlice";
+import type { AppDispatch, RootState } from "@/lib/store";
 
 export default function SignInPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const dispatch = useDispatch<AppDispatch>();
 
-  const callbackUrl = searchParams.get("callbackUrl") || "/account";
+  const { userInfo, actionStatus, error } = useSelector(
+    (state: RootState) => state.user
+  );
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setIsLoading(true);
-
-    try {
-      const result = await signIn("credentials", {
-        redirect: false,
-        email,
-        password,
-      });
-
-      if (result?.error) {
-        setError("Invalid email or password. Please try again.");
-        setIsLoading(false);
-      } else if (result?.ok) {
-        router.push(callbackUrl);
+  // Check if already logged in
+  useEffect(() => {
+    if (userInfo && userInfo.token) {
+      // Redirect based on role
+      switch (userInfo.role) {
+        case "Admin":
+          router.push("/admin/dashboard");
+          break;
+        case "Supplier":
+          router.push("/supplier/dashboard");
+          break;
+        case "Buyer":
+          router.push("/products");
+          break;
+        default:
+          router.push("/");
       }
-    } catch (error) {
-      console.error("Sign-in failed:", error);
-      setError("An unexpected error occurred. Please try again.");
-      setIsLoading(false);
     }
+  }, [userInfo, router]);
+
+  useEffect(() => {
+    // Handle login success
+    if (actionStatus === "succeeded" && userInfo) {
+      toast.success("Login Successful!");
+      dispatch(resetActionStatus());
+
+      // Navigate based on role
+      switch (userInfo.role) {
+        case "Admin":
+          router.push("/admin/dashboard");
+          break;
+        case "Supplier":
+          router.push("/supplier/dashboard");
+          break;
+        case "Buyer":
+          router.push("/products");
+          break;
+        default:
+          router.push("/");
+      }
+    }
+
+    // Handle login failure
+    if (actionStatus === "failed" && error) {
+      toast.error(error);
+      dispatch(resetActionStatus());
+    }
+  }, [actionStatus, userInfo, error, router, dispatch]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!email || !password) {
+      return toast.error("Please enter email and password");
+    }
+
+    if (password.length < 6) {
+      return toast.error("Password must be at least 6 characters");
+    }
+
+    dispatch(loginUser({ email, password }));
   };
+
+  const isLoading = actionStatus === "loading";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50 px-4 py-12 flex items-center justify-center">
       <div className="w-full max-w-md">
-        {/* Header */}
         <div className="mb-8 text-center">
           <div className="mb-4 inline-flex items-center justify-center w-16 h-16 rounded-full bg-orange-100">
             <Lock className="h-8 w-8 text-orange-600" />
@@ -65,17 +101,8 @@ export default function SignInPage() {
           <p className="text-gray-600">Sign in to your Jewelen account</p>
         </div>
 
-        {/* Form Card */}
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
           <form onSubmit={handleSubmit} className="p-8 space-y-6">
-            {/* Error Message */}
-            {error && (
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-red-50 border border-red-200">
-                <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-red-700 font-medium">{error}</p>
-              </div>
-            )}
-
             {/* Email Field */}
             <div className="space-y-2">
               <label
@@ -136,6 +163,7 @@ export default function SignInPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   disabled={isLoading}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:opacity-50 transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
                     <EyeOff className="h-5 w-5" />
@@ -146,16 +174,16 @@ export default function SignInPage() {
               </div>
             </div>
 
-            {/* Sign In Button */}
+            {/* Submit Button */}
             <Button
               type="submit"
               disabled={isLoading}
               className="w-full h-12 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed mt-8"
             >
               {isLoading ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center gap-2">
                   <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Signing in...
+                  <span>Signing in...</span>
                 </div>
               ) : (
                 "Sign In"
@@ -176,32 +204,24 @@ export default function SignInPage() {
 
             {/* Sign Up Link */}
             <Link
-              href="/register"
+              href="/signup"
               className="block w-full text-center px-4 py-2.5 border-2 border-orange-200 text-orange-600 font-semibold rounded-lg hover:bg-orange-50 transition-colors"
             >
               Create Account
             </Link>
           </form>
-
-          {/* Footer */}
-          <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 text-center text-sm text-gray-600">
-            By signing in, you agree to our{" "}
-            <Link
-              href="/terms"
-              className="text-orange-600 hover:text-orange-700 font-medium"
-            >
-              Terms
-            </Link>
-          </div>
         </div>
 
         {/* Demo Credentials - Remove in production */}
-        <div className="mt-6 p-4 rounded-lg bg-blue-50 border border-blue-200">
-          <p className="text-xs font-semibold text-blue-900 mb-2">
-            Demo Credentials (Development Only)
+        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800 font-semibold mb-2">
+            Demo Credentials:
           </p>
-          <p className="text-xs text-blue-700">Email: admin@example.com</p>
-          <p className="text-xs text-blue-700">Password: password123</p>
+          <div className="space-y-1 text-xs text-blue-700">
+            <p>Admin: admin@example.com / password123</p>
+            <p>Supplier: supplier@example.com / password123</p>
+            <p>Buyer: buyer@example.com / password123</p>
+          </div>
         </div>
       </div>
     </div>

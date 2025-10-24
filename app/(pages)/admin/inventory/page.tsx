@@ -1,7 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useDispatch, useSelector } from "react-redux";
+import { AppDispatch, RootState } from "@/lib/store";
+import { toast } from "react-toastify";
+import {
+  fetchJewelry,
+  deleteJewelry,
+  JewelryItem,
+} from "@/lib/features/jewelry/jewelrySlice";
+
 import {
   Table,
   TableBody,
@@ -37,129 +46,82 @@ import {
   Edit,
   Trash2,
   MoreHorizontal,
-  ArrowLeft,
-  ArrowRight,
+  Loader2,
 } from "lucide-react";
 
-// Dummy Data: Yeh data ab yahin se aa raha hai
-const dummyDiamonds = [
-  {
-    _id: "1",
-    stockId: "JWL-001",
-    lab: "GIA",
-    reportNumber: "123456789",
-    shape: "Round",
-    carat: 1.02,
-    color: "D",
-    clarity: "VVS1",
-    cut: "Excellent",
-    price: 12000,
-    user: { name: "Mystic Gems", companyName: "Mystic Gems Co." },
-    isActive: true,
-    imageLink:
-      "https://images.unsplash.com/photo-1610481615363-f220d343c5b5?w=100&h=100&fit=crop",
-  },
-  {
-    _id: "2",
-    stockId: "JWL-002",
-    lab: "IGI",
-    reportNumber: "987654321",
-    shape: "Princess",
-    carat: 0.75,
-    color: "E",
-    clarity: "VS2",
-    cut: "Very Good",
-    price: 6500,
-    user: { name: "Originals Jewelry", companyName: "Originals Inc." },
-    isActive: true,
-    imageLink:
-      "https://images.unsplash.com/photo-1599208008819-2d88a1013a7a?w=100&h=100&fit=crop",
-  },
-  {
-    _id: "3",
-    stockId: "JWL-003",
-    lab: "GIA",
-    reportNumber: "555555555",
-    shape: "Cushion",
-    carat: 2.15,
-    color: "G",
-    clarity: "SI1",
-    cut: "Excellent",
-    price: 25000,
-    user: { name: "Mystic Gems", companyName: "Mystic Gems Co." },
-    isActive: false,
-    imageLink:
-      "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=100&h=100&fit=crop",
-  },
-  {
-    _id: "4",
-    stockId: "JWL-004",
-    lab: "GIA",
-    reportNumber: "112233445",
-    shape: "Oval",
-    carat: 1.5,
-    color: "F",
-    clarity: "VVS2",
-    cut: "Excellent",
-    price: 18500,
-    user: { name: "Shine Bright LLC", companyName: "Shine Bright" },
-    isActive: true,
-    imageLink: "",
-  },
-];
-
-const placeholderImage = "/placeholder-diamond.jpg"; // Public folder mein ek placeholder image rakhein
+const placeholderImage = "/placeholder-jewelry.jpg";
 
 export default function AdminInventoryPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const sellerId = searchParams.get("sellerId");
+  const dispatch = useDispatch<AppDispatch>();
 
-  const [diamonds, setDiamonds] = useState(dummyDiamonds);
+  // ✅✅ Sudhaar Yahan Hai ✅✅
+  // Hum 'error' ko destructure kar rahe hain aur use 'listError' naam de rahe hain
+  const {
+    items,
+    listStatus,
+    error: listError,
+  } = useSelector((state: RootState) => state.jewelry);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedDiamond, setSelectedDiamond] = useState<
-    (typeof dummyDiamonds)[0] | null
-  >(null);
+  const [selectedItem, setSelectedItem] = useState<JewelryItem | null>(null);
 
-  // Filter logic
-  const filteredDiamonds = diamonds.filter((diamond) => {
-    const matchesSeller = sellerId
-      ? diamond.user?.companyName
-          ?.toLowerCase()
-          .includes(sellerId.toLowerCase())
+  useEffect(() => {
+    dispatch(fetchJewelry({}));
+  }, [dispatch]);
+
+  const filteredItems = items.filter((item) => {
+    return searchTerm
+      ? item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.name.toLowerCase().includes(searchTerm.toLowerCase())
       : true;
-    const matchesSearch = searchTerm
-      ? diamond.stockId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        diamond.shape.toLowerCase().includes(searchTerm.toLowerCase())
-      : true;
-    return matchesSeller && matchesSearch;
   });
 
-  const handleView = (diamond: (typeof dummyDiamonds)[0]) =>
-    console.log("View:", diamond.stockId);
-  const handleEdit = (diamond: (typeof dummyDiamonds)[0]) =>
-    console.log("Edit:", diamond.stockId);
-  const handleDelete = (diamond: (typeof dummyDiamonds)[0]) => {
-    setSelectedDiamond(diamond);
+  const handleView = (item: JewelryItem) =>
+    router.push(`/products/${item._id}`);
+  const handleEdit = (item: JewelryItem) =>
+    router.push(`/admin/inventory/edit/${item._id}`);
+
+  const handleDelete = (item: JewelryItem) => {
+    setSelectedItem(item);
     setDeleteDialogOpen(true);
   };
+
   const confirmDelete = () => {
-    if (selectedDiamond) {
-      setDiamonds((prev) => prev.filter((d) => d._id !== selectedDiamond._id));
-      alert(`Diamond ${selectedDiamond.stockId} has been deleted.`);
+    if (selectedItem) {
+      dispatch(deleteJewelry(selectedItem._id))
+        .unwrap()
+        .then(() => {
+          toast.success(`Item ${selectedItem.sku} has been deleted.`);
+        })
+        .catch((error) => {
+          toast.error(`Failed to delete: ${error}`);
+        });
       setDeleteDialogOpen(false);
-      setSelectedDiamond(null);
+      setSelectedItem(null);
     }
   };
 
-  const formatPrice = (price?: number) =>
-    price
-      ? new Intl.NumberFormat("en-IN", {
-          style: "currency",
-          currency: "INR",
-        }).format(price * 80)
-      : "N/A"; // Convert to INR
+  const formatPrice = (price: number) =>
+    new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+    }).format(price);
+
+  if (listStatus === "loading") {
+    return (
+      <div className="flex justify-center items-center h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (listStatus === "failed") {
+    return (
+      <div className="text-center text-red-500 mt-10">Error: {listError}</div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6">
@@ -167,29 +129,25 @@ export default function AdminInventoryPage() {
         <div>
           <h1 className="text-3xl font-bold">Inventory Management</h1>
           <p className="text-gray-500">
-            {sellerId
-              ? `Inventory for seller: ${sellerId}`
-              : `Total ${filteredDiamonds.length} diamonds`}
+            Total {filteredItems.length} items in inventory
           </p>
         </div>
         <Button
           onClick={() => router.push("/admin/inventory/add")}
           className="gap-2"
         >
-          <Plus className="h-4 w-4" /> Add Diamond
+          <Plus className="h-4 w-4" /> Add Jewelry
         </Button>
       </div>
 
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>
-              {sellerId ? "Seller's Diamonds" : "All Diamonds"}
-            </CardTitle>
+            <CardTitle>All Jewelry</CardTitle>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search by Stock ID or Shape..."
+                placeholder="Search by SKU or Name..."
                 className="pl-9 w-64"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -199,11 +157,11 @@ export default function AdminInventoryPage() {
         </CardHeader>
 
         <CardContent>
-          {filteredDiamonds.length === 0 ? (
+          {filteredItems.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
-              <h3 className="text-lg font-semibold">No Diamonds Found</h3>
+              <h3 className="text-lg font-semibold">No Jewelry Found</h3>
               <p className="text-sm mt-1">
-                Try adjusting your search or filters.
+                Try adjusting your search or add new items.
               </p>
             </div>
           ) : (
@@ -212,7 +170,7 @@ export default function AdminInventoryPage() {
                 <TableRow>
                   <TableHead>Image</TableHead>
                   <TableHead>Details</TableHead>
-                  <TableHead>Specs</TableHead>
+                  <TableHead>Primary Gemstone</TableHead>
                   <TableHead>Price</TableHead>
                   <TableHead>Seller</TableHead>
                   <TableHead>Status</TableHead>
@@ -220,73 +178,86 @@ export default function AdminInventoryPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredDiamonds.map((diamond) => (
-                  <TableRow key={diamond._id}>
-                    <TableCell>
-                      <img
-                        src={diamond.imageLink || placeholderImage}
-                        alt={diamond.shape}
-                        width={50}
-                        height={50}
-                        className="rounded-md border object-cover aspect-square"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">{diamond.stockId}</div>
-                      <div className="text-sm text-gray-500">
-                        {diamond.lab} {diamond.reportNumber}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">
-                        {diamond.shape} {diamond.carat?.toFixed(2)}ct
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {diamond.color} {diamond.clarity} {diamond.cut}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-bold">
-                        {formatPrice(diamond.price)}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">
-                        {diamond.user?.name || "—"}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={diamond.isActive ? "default" : "secondary"}
-                      >
-                        {diamond.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleView(diamond)}>
-                            <Eye className="h-4 w-4 mr-2" /> View
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEdit(diamond)}>
-                            <Edit className="h-4 w-4 mr-2" /> Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDelete(diamond)}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {filteredItems.map((item) => {
+                  const primaryGem = item.gemstones?.[0];
+                  return (
+                    <TableRow key={item._id}>
+                      <TableCell>
+                        <img
+                          src={item.images?.[0] || placeholderImage}
+                          alt={item.name}
+                          width={50}
+                          height={50}
+                          className="rounded-md border object-cover aspect-square"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium">{item.name}</div>
+                        <div className="text-sm text-gray-500">
+                          SKU: {item.sku}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {primaryGem ? (
+                          <>
+                            <div className="font-medium">
+                              {primaryGem.shape || primaryGem.type}{" "}
+                              {primaryGem.carat?.toFixed(2)}ct
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {primaryGem.color} {primaryGem.clarity}{" "}
+                              {primaryGem.cut}
+                            </div>
+                          </>
+                        ) : (
+                          "N/A"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-bold">
+                          {formatPrice(item.price)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium">
+                          {item.seller?.name || "—"}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            item.stockQuantity > 0 ? "default" : "secondary"
+                          }
+                        >
+                          {item.stockQuantity > 0 ? "In Stock" : "Out of Stock"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleView(item)}>
+                              <Eye className="h-4 w-4 mr-2" /> View
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEdit(item)}>
+                              <Edit className="h-4 w-4 mr-2" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleDelete(item)}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
@@ -298,9 +269,8 @@ export default function AdminInventoryPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action will permanently delete the diamond with Stock ID{" "}
-              <strong>{selectedDiamond?.stockId}</strong>. This cannot be
-              undone.
+              This action will permanently delete the item with SKU{" "}
+              <strong>{selectedItem?.sku}</strong>. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

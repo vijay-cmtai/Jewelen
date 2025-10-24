@@ -3,8 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react"; // signOut client-side hi rehta hai
-import { type Session } from "next-auth"; // Session ka type import karein
+import { signOut } from "next-auth/react";
+import { type Session } from "next-auth";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -20,17 +20,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-// Admin navigation links
 const adminNavLinks = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/inventory", label: "Inventory", icon: Package },
-  { href: "/admin/addInventory", label: "Add Inventory", icon: Package},
+  { href: "/admin/addInventory", label: "Add Inventory", icon: Package },
+  { href: "/admin/add-blog", label: "Add Blogs", icon: Package },
   { href: "/admin/orders", label: "Orders", icon: ListOrdered },
-  {href:"/admin/seller",label:"Seller",icon:ListOrdered},
+  { href: "/admin/seller", label: "Seller", icon: ListOrdered },
 ];
 
-// Props mein session ka type define karein
 export default function AdminClientLayout({
   children,
   session,
@@ -41,7 +40,6 @@ export default function AdminClientLayout({
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Reusable Sidebar Content
   const SidebarContent = ({ onLinkClick }: { onLinkClick?: () => void }) => (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-3 mb-6 pb-6 border-b">
@@ -50,7 +48,6 @@ export default function AdminClientLayout({
         </div>
         <div>
           <h2 className="text-lg font-bold">Admin Panel</h2>
-          {/* Ab 'status' ki jagah seedha 'session' check karein */}
           {session ? (
             <p className="text-xs text-gray-500 truncate">
               {session.user?.email || "Admin"}
@@ -97,7 +94,7 @@ export default function AdminClientLayout({
             signOut({ callbackUrl: "/" });
             onLinkClick?.();
           }}
-          disabled={!session} // Jab tak session load na ho, disable rakhein
+          disabled={!session}
         >
           <LogOut className="mr-2 h-4 w-4" />
           Logout
@@ -127,14 +124,15 @@ export default function AdminClientLayout({
         </div>
       </header>
 
-      <div className="md:grid md:grid-cols-[280px_1fr] lg:grid-cols-[300px_1fr]">
+      {/* ===== YAHAN CHANGES KIYE HAIN ===== */}
+      <div className="md:grid md:grid-cols-[280px_1fr] lg:grid-cols-[300px_1fr] md:h-screen">
         <aside className="hidden md:block p-8">
           <div className="sticky top-8 bg-white rounded-lg shadow-sm p-6 border h-[calc(100vh-4rem)]">
             <SidebarContent />
           </div>
         </aside>
 
-        <main className="p-4 md:p-8">{children}</main>
+        <main className="overflow-y-auto p-4 md:p-8">{children}</main>
       </div>
     </div>
   );

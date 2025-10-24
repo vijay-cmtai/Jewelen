@@ -1,6 +1,11 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useDispatch, useSelector } from "react-redux";
+import { AppDispatch, RootState } from "@/lib/store";
+import { fetchAllUsers } from "@/lib/features/users/userSlice";
+
 import {
   Table,
   TableBody,
@@ -12,41 +17,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Upload, Eye, UserPlus } from "lucide-react";
+import { Upload, Eye, UserPlus, Loader2 } from "lucide-react";
 
-// --- DUMMY DATA ---
-const dummySellers = [
-  {
-    _id: "seller1",
-    name: "Damon Salvatore",
-    email: "damon@supplier.com",
-    role: "Supplier",
-    companyName: "Mystic Gems",
-    status: "Approved",
-    createdAt: "2023-09-15T11:30:00.000Z",
-  },
-  {
-    _id: "seller2",
-    name: "Klaus Mikaelson",
-    email: "klaus@newsupplier.com",
-    role: "Supplier",
-    companyName: "Originals Jewelry",
-    status: "Pending",
-    createdAt: "2023-11-01T09:00:00.000Z",
-  },
-  {
-    _id: "seller3",
-    name: "Stefan Salvatore",
-    email: "stefan@supplier.com",
-    role: "Supplier",
-    companyName: "Ripper Diamonds",
-    status: "Rejected",
-    createdAt: "2023-08-20T15:00:00.000Z",
-  },
-];
-// --- END OF DUMMY DATA ---
-
-// Helper functions
+// Helper functions (same as before)
 const formatDate = (dateString?: string) => {
   if (!dateString) return "N/A";
   return new Date(dateString).toLocaleDateString("en-US", {
@@ -67,17 +40,27 @@ const getInitials = (name?: string) => {
 
 export default function AdminSellersPage() {
   const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
+
+  // Redux store se data aur status lein
+  const { users, listStatus, listError } = useSelector(
+    (state: RootState) => state.user
+  );
+
+  // Component load hone par sabhi users ko fetch karein
+  useEffect(() => {
+    dispatch(fetchAllUsers());
+  }, [dispatch]);
+
+  // Sirf 'Supplier' role waale users ko filter karein
+  const sellers = users.filter((user) => user.role === "Supplier");
 
   const handleAddInventory = (sellerId: string) => {
-    // Navigate to the add inventory page with sellerId as a query parameter
     router.push(`/admin/inventory/add?sellerId=${sellerId}`);
   };
 
-  const handleViewInventory = (sellerCompanyName: string) => {
-    // Navigate to the inventory page and filter by company name
-    router.push(
-      `/admin/inventory?sellerId=${encodeURIComponent(sellerCompanyName)}`
-    );
+  const handleViewInventory = (sellerId: string) => {
+    router.push(`/admin/inventory?sellerId=${sellerId}`);
   };
 
   const getStatusVariant = (
@@ -95,11 +78,27 @@ export default function AdminSellersPage() {
     }
   };
 
+  // Loading state
+  if (listStatus === "loading") {
+    return (
+      <div className="flex justify-center items-center h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  // Error state
+  if (listStatus === "failed") {
+    return (
+      <div className="text-center text-red-500 mt-10">Error: {listError}</div>
+    );
+  }
+
   return (
     <div className="p-4 md:p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">Seller Management</h1>
-        <Button onClick={() => alert("Redirecting to Add New Seller page...")}>
+        <Button onClick={() => router.push("/admin/users/add")}>
           <UserPlus className="w-4 h-4 mr-2" />
           Add New Seller
         </Button>
@@ -116,7 +115,7 @@ export default function AdminSellersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {dummySellers.length === 0 ? (
+            {sellers.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={5}
@@ -126,7 +125,7 @@ export default function AdminSellersPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              dummySellers.map((seller) => (
+              sellers.map((seller) => (
                 <TableRow key={seller._id}>
                   <TableCell>
                     <div className="flex items-center gap-4">
@@ -158,8 +157,8 @@ export default function AdminSellersPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() =>
-                        handleViewInventory(seller.companyName || "")
+                      onClick={
+                        () => handleViewInventory(seller._id) // ID se filter karna behtar hai
                       }
                     >
                       <Eye className="w-4 h-4 mr-2" />

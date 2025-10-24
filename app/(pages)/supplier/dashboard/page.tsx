@@ -1,5 +1,4 @@
 "use client";
-
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -35,8 +34,6 @@ import {
   YAxis,
   Tooltip,
 } from "recharts";
-
-// --- DUMMY DATA ---
 const dummyDashboardData = {
   stats: {
     totalRevenue: { value: "₹4,25,999", change: "+15.2%" },
@@ -94,7 +91,6 @@ const dummyDashboardData = {
   ],
 };
 // --- END OF DUMMY DATA ---
-
 const StatCard = ({
   title,
   value,
@@ -127,7 +123,6 @@ const StatCard = ({
     </CardContent>
   </Card>
 );
-
 export default function SupplierDashboardPage() {
   const { stats, salesOverview, bestSellers, recentOrders } =
     dummyDashboardData;

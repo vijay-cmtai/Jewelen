@@ -1,29 +1,32 @@
+"use client"; 
 import Image from "next/image";
 import Link from "next/link";
-
 const interests = [
   {
     title: "Gold Collection",
     sub: "Timeless elegance",
     img: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=500&q=80",
+    searchQuery: "gold",
   },
   {
     title: "Diamond Jewelry",
     sub: "Sparkle & shine",
     img: "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=500&q=80",
+    searchQuery: "diamond",
   },
   {
     title: "Engagement Rings",
     sub: "Forever starts here",
     img: "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=500&q=80",
+    searchQuery: "engagement ring",
   },
   {
     title: "Silver Essentials",
     sub: "Modern classics",
     img: "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=500&q=80",
+    searchQuery: "silver",
   },
 ];
-
 export default function Interests() {
   return (
     <section
@@ -46,7 +49,7 @@ export default function Interests() {
         {interests.map((item) => (
           <Link
             key={item.title}
-            href="/collections/essentials"
+            href={`/search?q=${encodeURIComponent(item.searchQuery)}`}
             className="group cursor-pointer"
           >
             <div className="relative h-[280px] rounded-2xl overflow-hidden shadow-md group-hover:shadow-xl transition-all duration-300">

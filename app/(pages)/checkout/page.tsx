@@ -4,9 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Lock } from "lucide-react";
+import { Lock, Loader2 } from "lucide-react";
 import { useAppContext } from "@/app/context/AppContext";
-import { products } from "@/lib/products";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -22,36 +21,39 @@ export default function CheckoutPage() {
   const [pincode, setPincode] = useState("");
   const [phone, setPhone] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("card");
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
   // Agar cart khaali hai to user ko wapas cart page par bhej dein
   useEffect(() => {
-    if (cartItems.length === 0) {
-      router.push("/cart");
-    }
+    // Thoda delay dein taaki cartItems Redux se load ho sakein
+    const timer = setTimeout(() => {
+      if (cartItems.length === 0) {
+        router.push("/cart");
+      }
+    }, 500);
+    return () => clearTimeout(timer);
   }, [cartItems, router]);
 
-  const cartProductDetails = cartItems
-    .map((item) => {
-      const product = products.find((p) => p.id === item.productId);
-      return { ...product!, quantity: item.quantity };
-    })
-    .filter((item) => item.id);
-
-  const subtotal = cartProductDetails.reduce(
-    (acc, item) => acc + item.price * item.quantity,
+  // cartItems mein ab poori product details hain, alag se map karne ki zaroorat nahi
+  const subtotal = cartItems.reduce(
+    (acc, item) => acc + (item.price || 0) * (item.quantity || 0),
     0
   );
   const total = subtotal; // Assuming free shipping
 
-  const handlePlaceOrder = (e: React.FormEvent) => {
+  const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simple validation
     if (!email || !name || !address || !city || !pincode || !phone) {
       alert("Please fill all shipping details.");
       return;
     }
 
-    // Simulate order placement
+    setIsPlacingOrder(true);
+
+    // Yahan aap backend API call karke order create karenge
+    // Abhi ke liye hum 2 second ka delay simulate kar rahe hain
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
     console.log("Order Placed:", {
       email,
       name,
@@ -60,16 +62,25 @@ export default function CheckoutPage() {
       pincode,
       phone,
       paymentMethod,
-      items: cartProductDetails,
+      items: cartItems,
       total,
     });
 
+    setIsPlacingOrder(false);
     alert("Order placed successfully! Thank you for shopping with us.");
 
-    // Clear the cart and redirect to homepage
-    clearCart();
+    clearCart(); // Redux action to clear cart
     router.push("/");
   };
+
+  // Jab tak cartItems load ho rahe hain, loader dikhayein
+  if (cartItems.length === 0) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <main className="bg-gray-50 min-h-screen">
@@ -78,7 +89,6 @@ export default function CheckoutPage() {
           {/* Left Side: Forms */}
           <div className="bg-white p-8 rounded-lg shadow-md border">
             <form onSubmit={handlePlaceOrder}>
-              {/* Contact Information */}
               <div>
                 <h2 className="text-lg font-medium text-gray-900">
                   Contact information
@@ -102,7 +112,6 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Shipping Information */}
               <div className="mt-10 border-t border-gray-200 pt-10">
                 <h2 className="text-lg font-medium text-gray-900">
                   Shipping information
@@ -191,7 +200,6 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Payment */}
               <div className="mt-10 border-t border-gray-200 pt-10">
                 <h2 className="text-lg font-medium text-gray-900">Payment</h2>
                 <fieldset className="mt-4">
@@ -251,10 +259,20 @@ export default function CheckoutPage() {
               <div className="mt-10 pt-6 border-t border-gray-200">
                 <Button
                   type="submit"
+                  disabled={isPlacingOrder}
                   className="w-full bg-orange-500 hover:bg-orange-600 rounded-full py-6 text-base font-semibold flex items-center justify-center gap-2"
                 >
-                  <Lock className="h-5 w-5" />
-                  Place Order
+                  {isPlacingOrder ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Placing Order...
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="h-5 w-5" />
+                      Place Order
+                    </>
+                  )}
                 </Button>
               </div>
             </form>
@@ -268,12 +286,12 @@ export default function CheckoutPage() {
               </h2>
               <div className="mt-4 flow-root">
                 <ul className="-my-6 divide-y divide-gray-200">
-                  {cartProductDetails.map((product) => (
-                    <li key={product.id} className="flex py-6">
+                  {cartItems.map((product) => (
+                    <li key={product._id} className="flex py-6">
                       <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-md border border-gray-200">
                         <Image
-                          src={product.imageUrl}
-                          alt={product.title}
+                          src={product.images[0]}
+                          alt={product.name}
                           width={100}
                           height={100}
                           className="h-full w-full object-cover object-center"
@@ -284,7 +302,7 @@ export default function CheckoutPage() {
                           <div className="flex justify-between text-base font-medium text-gray-900">
                             <h3>
                               <Link href={`/product/${product.slug}`}>
-                                {product.title}
+                                {product.name}
                               </Link>
                             </h3>
                             <p className="ml-4">

@@ -4,10 +4,10 @@ import { useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Star, Heart, Truck, CheckCircle, Minus, Plus } from "lucide-react";
-import { Product } from "@/lib/products";
+import { JewelryItem } from "@/lib/features/jewelry/jewelrySlice";
 import { useAppContext } from "@/app/context/AppContext";
 
-export default function ProductDisplay({ product }: { product: Product }) {
+export default function ProductDisplay({ product }: { product: JewelryItem }) {
   const [activeImage, setActiveImage] = useState(product.images[0]);
   const [quantity, setQuantity] = useState(1);
   const { addToCart, addToWishlist, isItemInWishlist } = useAppContext();
@@ -24,7 +24,7 @@ export default function ProductDisplay({ product }: { product: Product }) {
             >
               <Image
                 src={src}
-                alt={`${product.title} ${i + 1}`}
+                alt={`${product.name} ${i + 1}`}
                 fill
                 className="object-cover"
               />
@@ -34,7 +34,7 @@ export default function ProductDisplay({ product }: { product: Product }) {
         <div className="relative aspect-square w-full rounded-xl overflow-hidden border">
           <Image
             src={activeImage}
-            alt={product.title}
+            alt={product.name}
             fill
             className="object-cover"
           />
@@ -45,26 +45,22 @@ export default function ProductDisplay({ product }: { product: Product }) {
           {product.category}
         </span>
         <h1 className="text-3xl lg:text-4xl font-bold mt-3 text-gray-900">
-          {product.title}
+          {product.name}
         </h1>
         <div className="flex items-center gap-2 mt-4">
           <div className="flex items-center text-yellow-400">
+            {/* Replace with actual rating if available */}
             {[...Array(5)].map((_, i) => (
               <Star
                 key={i}
                 size={20}
                 fill="currentColor"
-                className={
-                  i < Math.floor(product.rating)
-                    ? "text-yellow-400"
-                    : "text-gray-300"
-                }
+                className={i < 4 ? "text-yellow-400" : "text-gray-300"}
               />
             ))}
           </div>
-          <span className="text-sm text-gray-500">
-            ({product.reviews.toLocaleString()} reviews)
-          </span>
+          {/* Replace with actual reviews if available */}
+          <span className="text-sm text-gray-500">(0 reviews)</span>
         </div>
         <p className="text-gray-600 mt-5 leading-relaxed">
           {product.description}
@@ -73,11 +69,7 @@ export default function ProductDisplay({ product }: { product: Product }) {
           <div className="text-4xl font-bold text-gray-900">
             ₹{product.price.toLocaleString()}
           </div>
-          {product.originalPrice && (
-            <div className="text-xl text-gray-400 line-through">
-              ₹{product.originalPrice.toLocaleString()}
-            </div>
-          )}
+          {/* Add original price logic if needed */}
         </div>
         <div className="mt-8 flex items-center gap-4">
           <div className="flex items-center border border-gray-300 rounded-full">
@@ -102,7 +94,7 @@ export default function ProductDisplay({ product }: { product: Product }) {
           <Button
             size="lg"
             className="flex-1 rounded-full bg-orange-500 hover:bg-orange-600 text-base font-semibold py-6"
-            onClick={() => addToCart(product.id, quantity)}
+            onClick={() => addToCart(product._id, quantity)}
           >
             Add to cart
           </Button>
@@ -110,11 +102,11 @@ export default function ProductDisplay({ product }: { product: Product }) {
             size="icon"
             variant="outline"
             className="rounded-full w-12 h-12"
-            onClick={() => addToWishlist(product.id)}
+            onClick={() => addToWishlist(product._id)}
           >
             <Heart
               size={20}
-              className={`transition-all ${isItemInWishlist(product.id) ? "fill-red-500 text-red-500" : "text-gray-600"}`}
+              className={`transition-all ${isItemInWishlist(product._id) ? "fill-red-500 text-red-500" : "text-gray-600"}`}
             />
           </Button>
         </div>
