@@ -7,17 +7,29 @@ import { usePathname, useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
 import { AppDispatch, RootState } from "@/lib/store";
 import { fetchJewelry } from "@/lib/features/jewelry/jewelrySlice";
-import { useDebounce } from "@/hooks/useDebounce"; // Naya hook import karein
+import { logout } from "@/lib/features/users/userSlice";
+import { useDebounce } from "@/hooks/useDebounce";
 import { cn, generateSlug } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Heart, Gift, Search, ShoppingCart, Loader2 } from "lucide-react";
+import {
+  Heart,
+  Gift,
+  Search,
+  ShoppingCart,
+  Loader2,
+  User,
+  LogOut,
+  LayoutDashboard,
+  ChevronDown,
+} from "lucide-react";
 
 type QuickLink = {
   label: string;
   href: string;
   icon?: React.ElementType;
 };
+
 const quickLinks: QuickLink[] = [
   { label: "Gifts", href: "/gifts", icon: Gift },
   { label: "New Arrivals", href: "/new" },
@@ -34,8 +46,10 @@ export function SiteHeader() {
 
   const [q, setQ] = useState("");
   const [isFocused, setIsFocused] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const debouncedQuery = useDebounce(q, 300);
   const searchRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
 
   const { items: cartItems } = useSelector((state: RootState) => state.cart);
   const { itemIds: wishlistItems } = useSelector(
@@ -44,20 +58,21 @@ export function SiteHeader() {
   const { items: searchResults, listStatus } = useSelector(
     (state: RootState) => state.jewelry
   );
+  const { userInfo } = useSelector((state: RootState) => state.user);
 
   const totalCartItems = cartItems.reduce(
     (total, item) => total + (item.quantity || 0),
     0
   );
 
-  // Live search ke liye API call
+  // Live search API call
   useEffect(() => {
     if (debouncedQuery) {
       dispatch(fetchJewelry({ search: debouncedQuery }));
     }
   }, [debouncedQuery, dispatch]);
 
-  // Search dropdown ko bahar click karne par band karne ka logic
+  // Close search dropdown on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -66,13 +81,35 @@ export function SiteHeader() {
       ) {
         setIsFocused(false);
       }
+      if (
+        profileRef.current &&
+        !profileRef.current.contains(event.target as Node)
+      ) {
+        setIsProfileOpen(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Iski ab zaroorat nahi hai
-  // function onSearch(e: React.FormEvent) { /* ... */ }
+  const handleLogout = () => {
+    dispatch(logout());
+    setIsProfileOpen(false);
+    router.push("/");
+  };
+
+  const getDashboardRoute = () => {
+    if (!userInfo) return "/dashboard";
+
+    switch (userInfo.role) {
+      case "Admin":
+        return "/admin/dashboard";
+      case "Supplier":
+        return "/supplier/dashboard";
+      default:
+        return "/account/dashboard";
+    }
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white border-b border-gray-200">
@@ -85,7 +122,7 @@ export function SiteHeader() {
             Jewelen
           </Link>
 
-          {/* --- SEARCH BAR AUR RESULTS DROPDOWN --- */}
+          {/* Search Bar */}
           <div ref={searchRef} className="relative ml-4 flex-1">
             <form className="flex items-center rounded-full border border-gray-300 bg-white overflow-hidden focus-within:border-black focus-within:ring-2 focus-within:ring-orange-300">
               <Input
@@ -106,7 +143,7 @@ export function SiteHeader() {
 
             {/* Search Results Dropdown */}
             {isFocused && q && (
-              <div className="absolute top-full mt-2 w-full bg-white rounded-lg shadow-2xl border max-h-[60vh] overflow-y-auto">
+              <div className="absolute top-full mt-2 w-full bg-white rounded-lg shadow-2xl border max-h-[60vh] overflow-y-auto z-50">
                 {listStatus === "loading" && (
                   <div className="p-4 flex items-center justify-center">
                     <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
@@ -162,8 +199,8 @@ export function SiteHeader() {
               </div>
             )}
           </div>
-          {/* ------------------------------------ */}
 
+          {/* Navigation Icons */}
           <nav className="ml-auto flex items-center gap-1 sm:gap-2">
             <Button
               variant="ghost"
@@ -180,6 +217,7 @@ export function SiteHeader() {
                 )}
               </Link>
             </Button>
+
             <Button
               variant="ghost"
               size="icon"
@@ -195,21 +233,81 @@ export function SiteHeader() {
                 )}
               </Link>
             </Button>
-            <Button
-              variant="outline"
-              className="hidden sm:inline-flex"
-              onClick={() => router.push("/signin")}
-            >
-              Sign In
-            </Button>
-            <Button
-              className="hidden sm:inline-flex bg-orange-500 text-white"
-              onClick={() => router.push("/signup")}
-            >
-              Register
-            </Button>
+
+            {/* User Profile or Sign In/Register */}
+            {userInfo ? (
+              <div ref={profileRef} className="relative">
+                <button
+                  onClick={() => setIsProfileOpen(!isProfileOpen)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-gray-100 transition"
+                >
+                  <div className="h-8 w-8 rounded-full bg-orange-500 flex items-center justify-center text-white font-semibold">
+                    {userInfo.name.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="hidden sm:inline text-sm font-medium">
+                    {userInfo.name}
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 transition-transform",
+                      isProfileOpen && "rotate-180"
+                    )}
+                  />
+                </button>
+
+                {/* Profile Dropdown */}
+                {isProfileOpen && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-2xl border py-2 z-50">
+                    <div className="px-4 py-3 border-b">
+                      <p className="font-semibold text-gray-900">
+                        {userInfo.name}
+                      </p>
+                      <p className="text-sm text-gray-500">{userInfo.email}</p>
+                      <span className="inline-block mt-1 px-2 py-1 text-xs rounded-full bg-orange-100 text-orange-700">
+                        {userInfo.role}
+                      </span>
+                    </div>
+
+                    <Link
+                      href={getDashboardRoute()}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition"
+                      onClick={() => setIsProfileOpen(false)}
+                    >
+                      <LayoutDashboard className="h-5 w-5 text-gray-600" />
+                      <span className="text-sm font-medium">Dashboard</span>
+                    </Link>
+
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 transition text-red-600 border-t"
+                    >
+                      <LogOut className="h-5 w-5" />
+                      <span className="text-sm font-medium">Logout</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  className="hidden sm:inline-flex"
+                  onClick={() => router.push("/signin")}
+                >
+                  Sign In
+                </Button>
+                <Button
+                  className="hidden sm:inline-flex bg-orange-500 text-white"
+                  onClick={() => router.push("/signup")}
+                >
+                  Register
+                </Button>
+              </>
+            )}
           </nav>
         </div>
+
+        {/* Quick Links */}
         <div className="hidden md:flex items-center justify-center gap-7 pb-3 pt-2">
           {quickLinks.map((l) => (
             <Link
