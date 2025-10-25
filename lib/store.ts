@@ -1,5 +1,6 @@
-// lib/store.ts
 import { configureStore } from "@reduxjs/toolkit";
+import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
+
 import userReducer from "@/lib/features/users/userSlice";
 import jewelryReducer from "@/lib/features/jewelry/jewelrySlice";
 import orderReducer from "./features/orders/orderSlice";
@@ -8,7 +9,8 @@ import addressReducer from "./features/address/addressSlice";
 import wishlistReducer from "./features/wishlist/wishlistSlice";
 import userDashboardReducer from "./features/dashboard/userDashboardSlice";
 import blogReducer from "./features/blog/blogSlice";
-import cartReducer from "./features/cart/cartSlice"; 
+import cartReducer from "./features/cart/cartSlice";
+
 export const makeStore = () => {
   return configureStore({
     reducer: {
@@ -35,6 +37,10 @@ export const makeStore = () => {
       }),
   });
 };
+
 export type AppStore = ReturnType<typeof makeStore>;
 export type RootState = ReturnType<AppStore["getState"]>;
-export type AppDispatch = ReturnType<typeof makeStore>["dispatch"];
+export type AppDispatch = AppStore["dispatch"];
+
+export const useAppDispatch: () => AppDispatch = useDispatch;
+export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;

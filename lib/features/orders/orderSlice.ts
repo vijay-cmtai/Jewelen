@@ -1,8 +1,6 @@
 import axios from "axios";
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "@/lib/store";
-
-// --- Types ---
 interface PopulatedItem {
   _id: string;
   jewelry: {
@@ -13,15 +11,13 @@ interface PopulatedItem {
   };
   priceAtOrder: number;
 }
-
 interface OrderItem {
   _id: string;
-  name?: string; // Optional for cases where it's not populated initially
+  name?: string;
   priceAtOrder: number;
   image?: { url: string };
   jewelry?: PopulatedItem["jewelry"];
 }
-
 export interface Order {
   _id: string;
   userId: {
@@ -41,13 +37,11 @@ export interface Order {
     | "Failed";
   createdAt: string;
 }
-
 interface MyOrdersState {
   data: Order[];
   status: "idle" | "loading" | "succeeded" | "failed";
   error: string | null;
 }
-
 interface OrderState {
   orders: Order[];
   selectedOrder: Order | null;
@@ -71,10 +65,58 @@ const initialState: OrderState = {
   singleError: null,
   actionError: null,
 };
-
 const API_URL = `${process.env.NEXT_PUBLIC_API_URL}/orders`;
+export const createOrder = createAsyncThunk<
+  { order: Order; razorpayOrder: any; razorpayKeyId: string },
+  { addressId: string; items: any[] }, // Ab hum items bhi pass karenge
+  { state: RootState; rejectValue: string }
+>(
+  "orders/create",
+  async ({ addressId, items }, { getState, rejectWithValue }) => {
+    try {
+      const token = getState().user.userInfo?.token;
+      if (!token) return rejectWithValue("Not authorized");
 
-// --- Async Thunks ---
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      // Body mein addressId ke saath 'items' bhi bhejein
+      const { data } = await axios.post(API_URL, { addressId, items }, config);
+      return data;
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to create order"
+      );
+    }
+  }
+);
+export const verifyPayment = createAsyncThunk<
+  { orderId: string },
+  {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  },
+  { state: RootState; rejectValue: string }
+>(
+  "orders/verifyPayment",
+  async (paymentData, { getState, rejectWithValue }) => {
+    try {
+      const token = getState().user.userInfo?.token;
+      if (!token) return rejectWithValue("Not authorized");
+
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      const { data } = await axios.post(
+        `${API_URL}/verify-payment`,
+        paymentData,
+        config
+      );
+      return data;
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.message || "Payment verification failed"
+      );
+    }
+  }
+);
 
 export const fetchMyOrders = createAsyncThunk<
   Order[],
@@ -96,7 +138,6 @@ export const fetchMyOrders = createAsyncThunk<
     );
   }
 });
-
 export const fetchAllOrders = createAsyncThunk<
   Order[],
   void,
@@ -114,7 +155,6 @@ export const fetchAllOrders = createAsyncThunk<
     );
   }
 });
-
 export const fetchOrderById = createAsyncThunk<
   Order,
   string,
@@ -135,7 +175,6 @@ export const fetchOrderById = createAsyncThunk<
     );
   }
 });
-
 const orderSlice = createSlice({
   name: "orders",
   initialState,
@@ -144,8 +183,36 @@ const orderSlice = createSlice({
       state.selectedOrder = null;
       state.singleStatus = "idle";
     },
+    resetActionStatus: (state) => {
+      state.actionStatus = "idle";
+      state.actionError = null;
+    },
   },
   extraReducers: (builder) => {
+    builder
+      .addCase(createOrder.pending, (state) => {
+        state.actionStatus = "loading";
+      })
+      .addCase(createOrder.fulfilled, (state) => {
+        state.actionStatus = "succeeded";
+      })
+      .addCase(createOrder.rejected, (state, action) => {
+        state.actionStatus = "failed";
+        state.actionError = action.payload as string;
+      });
+
+    builder
+      .addCase(verifyPayment.pending, (state) => {
+        state.actionStatus = "loading";
+      })
+      .addCase(verifyPayment.fulfilled, (state) => {
+        state.actionStatus = "succeeded";
+      })
+      .addCase(verifyPayment.rejected, (state, action) => {
+        state.actionStatus = "failed";
+        state.actionError = action.payload as string;
+      });
+
     builder
       .addCase(fetchMyOrders.pending, (state) => {
         state.myOrders.status = "loading";
@@ -197,5 +264,5 @@ const orderSlice = createSlice({
   },
 });
 
-export const { clearSelectedOrder } = orderSlice.actions;
+export const { clearSelectedOrder, resetActionStatus } = orderSlice.actions;
 export default orderSlice.reducer;

@@ -1,21 +1,36 @@
 "use client";
-
-import { createContext, useContext, ReactNode, useCallback } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { AppDispatch, RootState } from "@/lib/store";
 import {
-  addToCart as addToCartAction,
-  removeFromCart as removeFromCartAction,
-  clearCart as clearCartAction,
-  updateCartQuantity as updateCartQuantityAction,
+  createContext,
+  useContext,
+  ReactNode,
+  useCallback,
+  useEffect,
+} from "react";
+import { useAppDispatch, useAppSelector } from "@/lib/store";
+import {
+  fetchCart,
+  addToCart as addToCartThunk,
+  removeFromCart as removeFromCartThunk,
+  updateCartQuantity as updateCartQuantityThunk,
+  clearCartAction,
 } from "@/lib/features/cart/cartSlice";
 import {
-  addToWishlist as addToWishlistAction,
-  removeFromWishlist as removeFromWishlistAction,
+  fetchWishlist,
+  toggleWishlist as toggleWishlistThunk,
 } from "@/lib/features/wishlist/wishlistSlice";
+import { toast } from "react-toastify";
+
+interface MappedCartItem {
+  _id: string;
+  name: string;
+  price: number;
+  images: string[];
+  slug: string;
+  quantity: number;
+}
 
 interface AppContextType {
-  cartItems: any[];
+  cartItems: MappedCartItem[];
   wishlistItems: string[];
   addToCart: (productId: string, quantity?: number) => void;
   removeFromCart: (productId: string) => void;
@@ -29,80 +44,87 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const dispatch = useDispatch<AppDispatch>();
+  const dispatch = useAppDispatch();
 
-  const { items: cartItems } = useSelector((state: RootState) => state.cart);
-  const { itemIds: wishlistIds } = useSelector(
-    (state: RootState) => state.wishlist
-  );
-  const { items: allProducts } = useSelector(
-    (state: RootState) => state.jewelry
-  );
+  const { userInfo } = useAppSelector((state) => state.user);
+  const { items: cartData } = useAppSelector((state) => state.cart);
+  const { itemIds: wishlistItems } = useAppSelector((state) => state.wishlist);
+
+  useEffect(() => {
+    if (userInfo) {
+      dispatch(fetchCart());
+      dispatch(fetchWishlist());
+    }
+  }, [userInfo, dispatch]);
+
+  const cartItems: MappedCartItem[] = cartData
+    .filter((item) => item && item.jewelry)
+    .map((item) => ({
+      ...item.jewelry,
+      quantity: item.quantity,
+    }));
 
   const addToCart = useCallback(
     (productId: string, quantity: number = 1) => {
-      dispatch(addToCartAction({ productId, quantity }));
-      alert("Product added to cart!");
+      if (!userInfo) {
+        toast.error("Please login to add items to your cart.");
+        return;
+      }
+      dispatch(addToCartThunk({ productId, quantity }));
+      toast.success("Item added to cart!");
     },
-    [dispatch]
+    [dispatch, userInfo]
   );
 
   const removeFromCart = useCallback(
     (productId: string) => {
-      dispatch(removeFromCartAction({ productId }));
+      if (!userInfo) return;
+      dispatch(removeFromCartThunk(productId));
     },
-    [dispatch]
+    [dispatch, userInfo]
   );
 
   const updateQuantity = useCallback(
     (productId: string, quantity: number) => {
-      if (quantity >= 1) {
-        dispatch(updateCartQuantityAction({ productId, quantity }));
-      } else {
-        // Agar quantity 0 ya usse kam ho jaye, toh item ko cart se remove kar do
-        dispatch(removeFromCartAction({ productId }));
-      }
+      if (!userInfo) return;
+      dispatch(updateCartQuantityThunk({ productId, quantity }));
     },
-    [dispatch]
-  );
-
-  const isItemInWishlist = useCallback(
-    (productId: string): boolean => {
-      return wishlistIds.includes(productId);
-    },
-    [wishlistIds]
+    [dispatch, userInfo]
   );
 
   const addToWishlist = useCallback(
     (productId: string) => {
-      const productToAdd = allProducts.find((p) => p._id === productId);
-      if (productToAdd) {
-        if (isItemInWishlist(productId)) {
-          dispatch(removeFromWishlistAction({ diamondId: productId }));
-          alert("Removed from wishlist!");
-        } else {
-          dispatch(addToWishlistAction(productToAdd as any));
-          alert("Added to wishlist!");
-        }
+      if (!userInfo) {
+        toast.error("Please login to manage your wishlist.");
+        return;
       }
+      dispatch(toggleWishlistThunk(productId));
     },
-    [dispatch, allProducts, isItemInWishlist]
+    [dispatch, userInfo]
   );
 
   const removeFromWishlist = useCallback(
     (productId: string) => {
-      dispatch(removeFromWishlistAction({ diamondId: productId }));
+      if (!userInfo) return;
+      dispatch(toggleWishlistThunk(productId));
     },
-    [dispatch]
+    [dispatch, userInfo]
+  );
+
+  const isItemInWishlist = useCallback(
+    (productId: string): boolean => {
+      return wishlistItems.includes(productId);
+    },
+    [wishlistItems]
   );
 
   const clearCart = useCallback(() => {
     dispatch(clearCartAction());
   }, [dispatch]);
 
-  const value = {
+  const value: AppContextType = {
     cartItems,
-    wishlistItems: wishlistIds,
+    wishlistItems,
     addToCart,
     removeFromCart,
     updateQuantity,

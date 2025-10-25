@@ -1,145 +1,100 @@
-import axios from "axios";
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
+import axios, { AxiosError } from "axios";
 import type { RootState } from "@/lib/store";
-// Types
-export interface WishlistItem {
+
+export interface WishlistAPIItem {
   _id: string;
-  stockId: string;
-  shape: string;
-  carat: number;
-  color: string;
-  clarity: string;
+  name: string;
+  sku: string;
   price: number;
-  imageLink?: string;
+  images: string[];
+  slug: string;
 }
+
 interface WishlistState {
-  items: WishlistItem[];
+  items: WishlistAPIItem[];
   itemIds: string[];
-  listStatus: "idle" | "loading" | "succeeded" | "failed";
-  actionStatus: "idle" | "loading" | "succeeded" | "failed";
+  status: "idle" | "loading" | "succeeded" | "failed";
   error: string | null;
 }
+
 const initialState: WishlistState = {
   items: [],
   itemIds: [],
-  listStatus: "idle",
-  actionStatus: "idle",
+  status: "idle",
   error: null,
 };
+
 const API_URL = `${process.env.NEXT_PUBLIC_API_URL}/wishlist`;
+const getToken = (state: RootState) => state.user.userInfo?.token;
+
 export const fetchWishlist = createAsyncThunk<
-  WishlistItem[],
+  WishlistAPIItem[],
   void,
-  { state: RootState }
->("wishlist/fetchWishlist", async (_, { getState, rejectWithValue }) => {
+  { state: RootState; rejectValue: string }
+>("wishlist/fetch", async (_, { getState, rejectWithValue }) => {
   try {
-    const token = getState().user.userInfo?.token;
-    if (!token) throw new Error("Not authorized");
+    const token = getToken(getState());
+    if (!token) return [];
     const config = { headers: { Authorization: `Bearer ${token}` } };
-    const { data } = await axios.get<WishlistItem[]>(API_URL, config);
+    const { data } = await axios.get<WishlistAPIItem[]>(API_URL, config);
     return data;
-  } catch (error: any) {
+  } catch (err) {
+    const error = err as AxiosError<{ message: string }>;
     return rejectWithValue(
       error.response?.data?.message || "Could not fetch wishlist"
     );
   }
 });
-export const addToWishlist = createAsyncThunk<
-  WishlistItem,
-  WishlistItem,
-  { state: RootState }
->(
-  "wishlist/addToWishlist",
-  async (itemToAdd, { getState, rejectWithValue }) => {
-    try {
-      const token = getState().user.userInfo?.token;
-      if (!token) throw new Error("Not authorized");
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      await axios.post(`${API_URL}/add`, { diamondId: itemToAdd._id }, config);
-      return itemToAdd;
-    } catch (error: any) {
-      return rejectWithValue(
-        error.response?.data?.message || "Could not add to wishlist"
-      );
-    }
-  }
-);
-export const removeFromWishlist = createAsyncThunk<
+
+export const toggleWishlist = createAsyncThunk<
+  WishlistAPIItem[],
   string,
-  { diamondId: string },
-  { state: RootState }
->(
-  "wishlist/removeFromWishlist",
-  async ({ diamondId }, { getState, rejectWithValue }) => {
-    try {
-      const token = getState().user.userInfo?.token;
-      if (!token) throw new Error("Not authorized");
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      await axios.delete(`${API_URL}/remove/${diamondId}`, config);
-      return diamondId;
-    } catch (error: any) {
-      return rejectWithValue(
-        error.response?.data?.message || "Could not remove from wishlist"
-      );
-    }
+  { state: RootState; rejectValue: string }
+>("wishlist/toggle", async (productId, { getState, rejectWithValue }) => {
+  try {
+    const token = getToken(getState());
+    if (!token) throw new Error("Not authorized");
+    const config = { headers: { Authorization: `Bearer ${token}` } };
+    const { data } = await axios.post<WishlistAPIItem[]>(
+      `${API_URL}/toggle`,
+      { productId },
+      config
+    );
+    return data;
+  } catch (err) {
+    const error = err as AxiosError<{ message: string }>;
+    return rejectWithValue(
+      error.response?.data?.message || "Could not toggle wishlist item"
+    );
   }
-);
+});
+
 const wishlistSlice = createSlice({
   name: "wishlist",
   initialState,
-  reducers: {
-    resetWishlistStatus: (state) => {
-      state.actionStatus = "idle";
-      state.error = null;
-    },
-    removeItemOptimistic: (state, action: PayloadAction<string>) => {
-      state.items = state.items.filter((item) => item._id !== action.payload);
-      state.itemIds = state.itemIds.filter((id) => id !== action.payload);
-    },
-  },
+  reducers: {},
   extraReducers: (builder) => {
+    const handleFulfilled = (
+      state: WishlistState,
+      action: PayloadAction<WishlistAPIItem[]>
+    ) => {
+      state.status = "succeeded";
+      state.items = action.payload;
+      state.itemIds = action.payload.map((item) => item._id);
+    };
+
     builder
       .addCase(fetchWishlist.pending, (state) => {
-        state.listStatus = "loading";
+        state.status = "loading";
       })
-      .addCase(fetchWishlist.fulfilled, (state, action) => {
-        state.listStatus = "succeeded";
-        state.items = action.payload;
-        state.itemIds = action.payload.map((item) => item._id);
-      })
+      .addCase(fetchWishlist.fulfilled, handleFulfilled)
       .addCase(fetchWishlist.rejected, (state, action) => {
-        state.listStatus = "failed";
+        state.status = "failed";
         state.error = action.payload as string;
-      });
-    builder
-      .addCase(addToWishlist.pending, (state) => {
-        state.actionStatus = "loading";
       })
-      .addCase(addToWishlist.fulfilled, (state, action) => {
-        state.actionStatus = "succeeded";
-        state.items.push(action.payload);
-        state.itemIds.push(action.payload._id);
-      })
-      .addCase(addToWishlist.rejected, (state, action) => {
-        state.actionStatus = "failed";
-        state.error = action.payload as string;
-      });
-    builder
-      .addCase(removeFromWishlist.pending, (state) => {
-        state.actionStatus = "loading";
-      })
-      .addCase(removeFromWishlist.fulfilled, (state, action) => {
-        state.actionStatus = "succeeded";
-        state.items = state.items.filter((item) => item._id !== action.payload);
-        state.itemIds = state.itemIds.filter((id) => id !== action.payload);
-      })
-      .addCase(removeFromWishlist.rejected, (state, action) => {
-        state.actionStatus = "failed";
-        state.error = action.payload as string;
-      });
+      .addCase(toggleWishlist.fulfilled, handleFulfilled);
   },
 });
 
-export const { resetWishlistStatus, removeItemOptimistic } =
-  wishlistSlice.actions;
 export default wishlistSlice.reducer;

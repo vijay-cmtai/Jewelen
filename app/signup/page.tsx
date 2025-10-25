@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-// CHANGE 1: Admin ke liye ShieldAlert icon import karein
-import { Users, Package, ShieldAlert } from "lucide-react";
+import { Users, ShieldAlert } from "lucide-react";
 import { toast } from "react-toastify";
 import { useSelector, useDispatch } from "react-redux";
 import {
@@ -14,26 +14,29 @@ import {
 } from "@/lib/features/users/userSlice";
 import type { AppDispatch, RootState } from "@/lib/store";
 
-// CHANGE 2: UserRole mein 'Admin' ko add karein
-type UserRole = "Buyer" | "Supplier" | "Admin";
+type UserRole = "User" | "Admin";
 
 export default function SignUpPage() {
-  const [selectedRole, setSelectedRole] = useState<UserRole>("Buyer");
+  const [selectedRole, setSelectedRole] = useState<UserRole>("User");
   const [file, setFile] = useState<File | null>(null);
-
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
-    companyName: "",
-    businessType: "",
-    companyCountry: "",
-    companyWebsite: "",
   });
 
   const dispatch = useDispatch<AppDispatch>();
-  const { actionStatus, error } = useSelector((state: RootState) => state.user);
+  const router = useRouter();
+  const { userInfo, actionStatus, error } = useSelector(
+    (state: RootState) => state.user
+  );
+
+  useEffect(() => {
+    if (userInfo) {
+      router.push("/");
+    }
+  }, [userInfo, router]);
 
   useEffect(() => {
     if (actionStatus === "failed" && error) {
@@ -41,51 +44,23 @@ export default function SignUpPage() {
       dispatch(resetActionStatus());
     }
     if (actionStatus === "succeeded") {
-      // CHANGE 3: Role ke hisaab se alag success message dikhayein
-      const successMessage =
-        selectedRole === "Admin"
-          ? "Admin account created successfully!"
-          : "Registration request submitted! Please wait for admin approval.";
-      toast.success(successMessage);
-
-      // Reset form on successful submission
-      setFormData({
-        name: "",
-        email: "",
-        password: "",
-        confirmPassword: "",
-        companyName: "",
-        businessType: "",
-        companyCountry: "",
-        companyWebsite: "",
-      });
-      setFile(null);
-      const fileInput = document.getElementById(
-        "file-upload"
-      ) as HTMLInputElement;
-      if (fileInput) fileInput.value = "";
+      toast.success("Registration successful! Redirecting...");
+      router.push("/signin");
       dispatch(resetActionStatus());
     }
-  }, [actionStatus, error, dispatch, selectedRole]);
+  }, [actionStatus, error, dispatch, router]);
 
-  // CHANGE 4: Admin role ko userTypes array mein add karein
   const userTypes = [
     {
-      role: "Buyer" as UserRole,
-      label: "Customer / Buyer",
-      description: "Shop for jewelry",
+      role: "User" as UserRole,
+      label: "User",
+      description: "Create a standard user account.",
       icon: Users,
-    },
-    {
-      role: "Supplier" as UserRole,
-      label: "Supplier",
-      description: "Sell your products",
-      icon: Package,
     },
     {
       role: "Admin" as UserRole,
       label: "Admin",
-      description: "Manage the platform",
+      description: "Create an administrator account.",
       icon: ShieldAlert,
     },
   ];
@@ -102,7 +77,6 @@ export default function SignUpPage() {
     }
   }
 
-  // CHANGE 5: Form submission logic ko update karein
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -111,43 +85,31 @@ export default function SignUpPage() {
     }
 
     const registrationData = new FormData();
-    // Personal details hamesha add hongi
     registrationData.append("name", formData.name);
     registrationData.append("email", formData.email);
     registrationData.append("password", formData.password);
     registrationData.append("role", selectedRole);
 
-    // Agar role Buyer ya Supplier hai, tabhi business details add karein
-    if (selectedRole === "Buyer" || selectedRole === "Supplier") {
-      if (!file) {
-        return toast.error("Business document is a required field.");
-      }
-      registrationData.append("companyName", formData.companyName);
-      registrationData.append("businessType", formData.businessType);
-      registrationData.append("companyCountry", formData.companyCountry);
-      registrationData.append("companyWebsite", formData.companyWebsite);
-      registrationData.append("businessDocument", file);
+    if (file) {
+      registrationData.append("profilePicture", file);
     }
-
-    // Admin ke liye, koi extra field add nahi hoga
 
     dispatch(registerUser(registrationData));
   }
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-12">
-      <div className="mx-auto max-w-4xl">
-        <div className="mb-12 text-center">
+      <div className="mx-auto max-w-2xl">
+        <div className="mb-10 text-center">
           <h1 className="text-4xl font-bold tracking-tight text-gray-800">
-            Join Jewelen
+            Create an Account
           </h1>
           <p className="mt-2 text-lg text-gray-600">
-            Create your account by selecting your role
+            First, select your account type
           </p>
         </div>
 
-        {/* CHANGE 6: Grid layout ko 3 columns ke liye adjust karein */}
-        <div className="mb-10 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {userTypes.map(({ role, label, description, icon: Icon }) => (
             <button
               key={role}
@@ -176,15 +138,10 @@ export default function SignUpPage() {
             noValidate
           >
             <h2 className="mb-4 text-center text-2xl font-bold text-gray-900">
-              Register as a{" "}
-              {userTypes.find((u) => u.role === selectedRole)?.label}
+              Register as a {selectedRole}
             </h2>
 
-            {/* Personal Information (yeh sabke liye hai) */}
             <div className="space-y-4">
-              <h3 className="font-semibold text-gray-700 border-b pb-2">
-                Personal Information
-              </h3>
               <Input
                 name="name"
                 type="text"
@@ -218,67 +175,26 @@ export default function SignUpPage() {
                 value={formData.confirmPassword}
                 onChange={handleInputChange}
               />
-            </div>
-
-            {/* CHANGE 7: Business Details ko conditionally render karein */}
-            {(selectedRole === "Buyer" || selectedRole === "Supplier") && (
-              <div className="space-y-4 pt-4">
-                <h3 className="font-semibold text-gray-700 border-b pb-2">
-                  Business Details
-                </h3>
+              <div>
+                <label
+                  htmlFor="file-upload"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
+                  Profile Picture (Optional)
+                </label>
                 <Input
-                  name="companyName"
-                  type="text"
-                  required
-                  placeholder="Company Name"
-                  value={formData.companyName}
-                  onChange={handleInputChange}
+                  id="file-upload"
+                  name="profilePicture"
+                  type="file"
+                  onChange={handleFileChange}
+                  accept="image/*"
+                  className="file:text-orange-600 file:font-semibold"
                 />
-                <Input
-                  name="businessType"
-                  type="text"
-                  required
-                  placeholder="Type of Business (e.g., Retailer)"
-                  value={formData.businessType}
-                  onChange={handleInputChange}
-                />
-                <Input
-                  name="companyCountry"
-                  type="text"
-                  required
-                  placeholder="Country"
-                  value={formData.companyCountry}
-                  onChange={handleInputChange}
-                />
-                <Input
-                  name="companyWebsite"
-                  type="url"
-                  placeholder="Website (e.g., https://example.com)"
-                  value={formData.companyWebsite}
-                  onChange={handleInputChange}
-                />
-                <div>
-                  <label
-                    htmlFor="file-upload"
-                    className="block text-sm font-medium text-gray-700 mb-2"
-                  >
-                    Business Document (e.g., GST Certificate){" "}
-                    <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    id="file-upload"
-                    name="file-upload"
-                    type="file"
-                    required
-                    onChange={handleFileChange}
-                    className="file:text-orange-600 file:font-semibold"
-                  />
-                  {file && (
-                    <p className="text-xs text-gray-500 mt-1">{file.name}</p>
-                  )}
-                </div>
+                {file && (
+                  <p className="text-xs text-gray-500 mt-1">{file.name}</p>
+                )}
               </div>
-            )}
+            </div>
 
             <Button
               type="submit"

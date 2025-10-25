@@ -2,26 +2,18 @@ import axios from "axios";
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "@/lib/store";
 
-// ============================================
-// TYPES & INTERFACES
-// ============================================
-
 export interface UserInfo {
   _id: string;
   name: string;
   email: string;
-  role: "Admin" | "Buyer" | "Supplier";
+  role: "Admin" | "User";
   status: "Pending" | "Approved" | "Rejected";
-  isAdmin?: boolean; // ✅ Blog ke liye admin check
+  isAdmin?: boolean;
   createdAt?: string;
-  companyName?: string;
-  tradingName?: string;
-  businessType?: string;
-  companyCountry?: string;
-  corporateIdentityNumber?: string;
-  companyWebsite?: string;
-  companyAddress?: string;
-  avatarUrl?: string;
+  profilePicture?: {
+    public_id: string;
+    url: string;
+  };
   token: string;
 }
 
@@ -36,10 +28,6 @@ interface UserState {
   singleError: string | null;
   listError: string | null;
 }
-
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
 
 const getUserInfoFromStorage = (): UserInfo | null => {
   if (typeof window === "undefined") return null;
@@ -68,10 +56,6 @@ const removeUserInfoFromStorage = (): void => {
   }
 };
 
-// ============================================
-// INITIAL STATE
-// ============================================
-
 const initialState: UserState = {
   userInfo: getUserInfoFromStorage(),
   users: [],
@@ -83,10 +67,6 @@ const initialState: UserState = {
   singleError: null,
   listError: null,
 };
-
-// ============================================
-// API CONFIGURATION
-// ============================================
 
 const API_URL = `${process.env.NEXT_PUBLIC_API_URL}/auth`;
 
@@ -103,21 +83,22 @@ const getMultipartConfig = (token: string) => ({
   },
 });
 
-// ============================================
-// ASYNC THUNKS
-// ============================================
-
-/**
- * Register a new user
- */
 export const registerUser = createAsyncThunk<
-  { message: string },
+  UserInfo,
   FormData,
   { rejectValue: string }
 >("user/register", async (userData, { rejectWithValue }) => {
   try {
-    const { data } = await axios.post(`${API_URL}/register`, userData);
-    return data;
+    const { data } = await axios.post<UserInfo>(
+      `${API_URL}/register`,
+      userData
+    );
+    const userInfoWithAdmin = {
+      ...data,
+      isAdmin: data.role === "Admin",
+    };
+    saveUserInfoToStorage(userInfoWithAdmin);
+    return userInfoWithAdmin;
   } catch (error: any) {
     const message =
       error.response?.data?.message || error.message || "Registration failed";
@@ -125,9 +106,6 @@ export const registerUser = createAsyncThunk<
   }
 });
 
-/**
- * Login user
- */
 export const loginUser = createAsyncThunk<
   UserInfo,
   { email: string; password: string },
@@ -135,13 +113,10 @@ export const loginUser = createAsyncThunk<
 >("user/login", async (loginData, { rejectWithValue }) => {
   try {
     const { data } = await axios.post<UserInfo>(`${API_URL}/login`, loginData);
-
-    // Add isAdmin flag based on role
     const userInfoWithAdmin = {
       ...data,
       isAdmin: data.role === "Admin",
     };
-
     saveUserInfoToStorage(userInfoWithAdmin);
     return userInfoWithAdmin;
   } catch (error: any) {
@@ -151,9 +126,6 @@ export const loginUser = createAsyncThunk<
   }
 });
 
-/**
- * Fetch all users (Admin only)
- */
 export const fetchAllUsers = createAsyncThunk<
   UserInfo[],
   void,
@@ -164,13 +136,9 @@ export const fetchAllUsers = createAsyncThunk<
     if (!token) {
       return rejectWithValue("Not authorized. Please login again.");
     }
-
     const config = getAuthConfig(token);
-    const { data } = await axios.get<{ users: UserInfo[] }>(
-      `${API_URL}/users`,
-      config
-    );
-    return data.users;
+    const { data } = await axios.get<UserInfo[]>(`${API_URL}/all`, config);
+    return data;
   } catch (error: any) {
     const message =
       error.response?.data?.message || error.message || "Failed to fetch users";
@@ -178,9 +146,6 @@ export const fetchAllUsers = createAsyncThunk<
   }
 });
 
-/**
- * Fetch single user by ID
- */
 export const fetchUserById = createAsyncThunk<
   UserInfo,
   string,
@@ -191,12 +156,8 @@ export const fetchUserById = createAsyncThunk<
     if (!token) {
       return rejectWithValue("Not authorized. Please login again.");
     }
-
     const config = getAuthConfig(token);
-    const { data } = await axios.get<UserInfo>(
-      `${API_URL}/users/${userId}`,
-      config
-    );
+    const { data } = await axios.get<UserInfo>(`${API_URL}/${userId}`, config);
     return data;
   } catch (error: any) {
     const message =
@@ -207,9 +168,6 @@ export const fetchUserById = createAsyncThunk<
   }
 });
 
-/**
- * Update user profile (with avatar upload support)
- */
 export const updateProfile = createAsyncThunk<
   UserInfo,
   FormData,
@@ -228,14 +186,12 @@ export const updateProfile = createAsyncThunk<
       config
     );
 
-    // Merge updated data with existing userInfo
     const updatedUserInfo: UserInfo = {
       ...userInfo,
       ...data,
-      token: userInfo.token, // Keep the token
-      isAdmin: userInfo.isAdmin, // Keep admin status
+      token: userInfo.token,
+      isAdmin: userInfo.isAdmin,
     };
-
     saveUserInfoToStorage(updatedUserInfo);
     return updatedUserInfo;
   } catch (error: any) {
@@ -247,42 +203,6 @@ export const updateProfile = createAsyncThunk<
   }
 });
 
-/**
- * Update user status (Admin only)
- */
-export const updateUserStatus = createAsyncThunk<
-  UserInfo,
-  { userId: string; status: "Approved" | "Rejected" },
-  { state: RootState; rejectValue: string }
->(
-  "user/updateStatus",
-  async ({ userId, status }, { getState, rejectWithValue }) => {
-    try {
-      const token = getState().user.userInfo?.token;
-      if (!token) {
-        return rejectWithValue("Not authorized. Please login again.");
-      }
-
-      const config = getAuthConfig(token);
-      const { data } = await axios.patch<UserInfo>(
-        `${API_URL}/users/${userId}/status`,
-        { status },
-        config
-      );
-      return data;
-    } catch (error: any) {
-      const message =
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to update user status";
-      return rejectWithValue(message);
-    }
-  }
-);
-
-/**
- * Delete user (Admin only)
- */
 export const deleteUser = createAsyncThunk<
   string,
   string,
@@ -293,9 +213,8 @@ export const deleteUser = createAsyncThunk<
     if (!token) {
       return rejectWithValue("Not authorized. Please login again.");
     }
-
     const config = getAuthConfig(token);
-    await axios.delete(`${API_URL}/users/${userId}`, config);
+    await axios.delete(`${API_URL}/${userId}`, config);
     return userId;
   } catch (error: any) {
     const message =
@@ -304,17 +223,10 @@ export const deleteUser = createAsyncThunk<
   }
 });
 
-// ============================================
-// SLICE DEFINITION
-// ============================================
-
 const userSlice = createSlice({
   name: "user",
   initialState,
   reducers: {
-    /**
-     * Logout user and clear all data
-     */
     logout: (state) => {
       removeUserInfoFromStorage();
       state.userInfo = null;
@@ -327,56 +239,40 @@ const userSlice = createSlice({
       state.singleError = null;
       state.listError = null;
     },
-
-    /**
-     * Reset action status
-     */
     resetActionStatus: (state) => {
       state.actionStatus = "idle";
       state.error = null;
     },
-
-    /**
-     * Reset single user status
-     */
     resetSingleStatus: (state) => {
       state.singleStatus = "idle";
       state.singleError = null;
     },
-
-    /**
-     * Reset list status
-     */
     resetListStatus: (state) => {
       state.listStatus = "idle";
       state.listError = null;
     },
-
-    /**
-     * Clear selected user
-     */
     clearSelectedUser: (state) => {
       state.selectedUser = null;
     },
   },
   extraReducers: (builder) => {
-    // ========== REGISTER USER ==========
     builder
       .addCase(registerUser.pending, (state) => {
         state.actionStatus = "loading";
         state.error = null;
       })
-      .addCase(registerUser.fulfilled, (state) => {
-        state.actionStatus = "succeeded";
-        state.error = null;
-      })
+      .addCase(
+        registerUser.fulfilled,
+        (state, action: PayloadAction<UserInfo>) => {
+          state.actionStatus = "succeeded";
+          state.userInfo = action.payload;
+          state.error = null;
+        }
+      )
       .addCase(registerUser.rejected, (state, action) => {
         state.actionStatus = "failed";
         state.error = action.payload as string;
-      });
-
-    // ========== LOGIN USER ==========
-    builder
+      })
       .addCase(loginUser.pending, (state) => {
         state.actionStatus = "loading";
         state.error = null;
@@ -392,10 +288,7 @@ const userSlice = createSlice({
       .addCase(loginUser.rejected, (state, action) => {
         state.actionStatus = "failed";
         state.error = action.payload as string;
-      });
-
-    // ========== FETCH ALL USERS ==========
-    builder
+      })
       .addCase(fetchAllUsers.pending, (state) => {
         state.listStatus = "loading";
         state.listError = null;
@@ -411,10 +304,7 @@ const userSlice = createSlice({
       .addCase(fetchAllUsers.rejected, (state, action) => {
         state.listStatus = "failed";
         state.listError = action.payload as string;
-      });
-
-    // ========== FETCH USER BY ID ==========
-    builder
+      })
       .addCase(fetchUserById.pending, (state) => {
         state.singleStatus = "loading";
         state.singleError = null;
@@ -430,10 +320,7 @@ const userSlice = createSlice({
       .addCase(fetchUserById.rejected, (state, action) => {
         state.singleStatus = "failed";
         state.singleError = action.payload as string;
-      });
-
-    // ========== UPDATE PROFILE ==========
-    builder
+      })
       .addCase(updateProfile.pending, (state) => {
         state.actionStatus = "loading";
         state.error = null;
@@ -449,41 +336,7 @@ const userSlice = createSlice({
       .addCase(updateProfile.rejected, (state, action) => {
         state.actionStatus = "failed";
         state.error = action.payload as string;
-      });
-
-    // ========== UPDATE USER STATUS ==========
-    builder
-      .addCase(updateUserStatus.pending, (state) => {
-        state.actionStatus = "loading";
-        state.error = null;
       })
-      .addCase(
-        updateUserStatus.fulfilled,
-        (state, action: PayloadAction<UserInfo>) => {
-          state.actionStatus = "succeeded";
-          state.error = null;
-
-          // Update user in the users list
-          const index = state.users.findIndex(
-            (user) => user._id === action.payload._id
-          );
-          if (index !== -1) {
-            state.users[index] = action.payload;
-          }
-
-          // Update selected user if it's the same
-          if (state.selectedUser?._id === action.payload._id) {
-            state.selectedUser = action.payload;
-          }
-        }
-      )
-      .addCase(updateUserStatus.rejected, (state, action) => {
-        state.actionStatus = "failed";
-        state.error = action.payload as string;
-      });
-
-    // ========== DELETE USER ==========
-    builder
       .addCase(deleteUser.pending, (state) => {
         state.actionStatus = "loading";
         state.error = null;
@@ -491,11 +344,7 @@ const userSlice = createSlice({
       .addCase(deleteUser.fulfilled, (state, action: PayloadAction<string>) => {
         state.actionStatus = "succeeded";
         state.error = null;
-
-        // Remove user from the users list
         state.users = state.users.filter((user) => user._id !== action.payload);
-
-        // Clear selected user if it's the deleted one
         if (state.selectedUser?._id === action.payload) {
           state.selectedUser = null;
         }
@@ -507,10 +356,6 @@ const userSlice = createSlice({
   },
 });
 
-// ============================================
-// EXPORTS
-// ============================================
-
 export const {
   logout,
   resetActionStatus,
@@ -520,5 +365,3 @@ export const {
 } = userSlice.actions;
 
 export default userSlice.reducer;
-
-
