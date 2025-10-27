@@ -149,7 +149,6 @@ export default function CartPage() {
             })}
           </section>
 
-          {/* --- YAHAN BADLAV KIYA GAYA HAI: ORDER SUMMARY --- */}
           <section className="bg-white p-6 rounded-lg shadow-sm border h-fit lg:sticky lg:top-24">
             <h2 className="text-xl font-semibold border-b pb-4 mb-4">
               Order Summary
@@ -172,13 +171,19 @@ export default function CartPage() {
                 <span>₹{grandTotal.toLocaleString()}</span>
               </div>
             </div>
-            <Link href="/checkout" passHref>
-              <Button className="w-full mt-6 bg-orange-500 hover:bg-orange-600 rounded-full py-6 text-base font-semibold">
-                Proceed to Checkout
-              </Button>
-            </Link>
+
+            {/* ================================== */}
+            {/* ========= THIS IS THE FIX ======== */}
+            {/* ================================== */}
+            <Button
+              asChild
+              className="w-full mt-6 bg-orange-500 hover:bg-orange-600 rounded-full py-6 text-base font-semibold"
+            >
+              <Link href="/checkout">Proceed to Checkout</Link>
+            </Button>
+            {/* ================================== */}
+            {/* ================================== */}
           </section>
-          {/* --- END OF CHANGES --- */}
         </div>
       </div>
     </main>

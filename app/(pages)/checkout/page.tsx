@@ -1,3 +1,5 @@
+// app/checkout/page.tsx
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -19,6 +21,7 @@ declare global {
   }
 }
 
+// <-- YEH CODE CHECKOUT PAGE KA HAI
 export default function CheckoutPage() {
   const { cartItems, clearCart } = useAppContext();
   const router = useRouter();
@@ -42,8 +45,12 @@ export default function CheckoutPage() {
   }, []);
 
   useEffect(() => {
+    if (!userInfo) {
+      router.push("/login?redirect=/checkout");
+      return;
+    }
     dispatch(fetchAddresses());
-  }, [dispatch]);
+  }, [dispatch, userInfo, router]);
 
   useEffect(() => {
     if (addresses.length > 0) {
@@ -52,29 +59,23 @@ export default function CheckoutPage() {
     }
   }, [addresses]);
 
-  // --- NAYI LOGIC: SABHI TOTALS CALCULATE KAREIN ---
   const mrpTotal = cartItems.reduce(
     (acc, item) =>
       acc + (item?.originalPrice || item?.price || 0) * (item?.quantity || 0),
     0
   );
-
   const discountedSubtotal = cartItems.reduce(
     (acc, item) => acc + (item?.price || 0) * (item?.quantity || 0),
     0
   );
-
   const totalDiscount = mrpTotal - discountedSubtotal;
-
   const totalTax = cartItems.reduce(
     (acc, item) =>
       acc +
       ((item?.price || 0) * (item?.quantity || 0) * (item?.tax || 0)) / 100,
     0
   );
-
   const grandTotal = discountedSubtotal + totalTax;
-  // --------------------------------------------------
 
   const handlePlaceOrder = async () => {
     if (!selectedAddressId) {
@@ -82,18 +83,13 @@ export default function CheckoutPage() {
       return;
     }
     try {
-      // =========================================================
-      // ========= THIS IS THE ONLY CHANGE IN THIS FILE ==========
-      // =========================================================
       const result = await dispatch(
         createOrder({
           addressId: selectedAddressId,
           items: cartItems,
-          totalAmount: grandTotal, // <-- PASSING THE CORRECT TOTAL
+          totalAmount: grandTotal,
         })
       ).unwrap();
-      // =========================================================
-      // =========================================================
 
       const { razorpayOrder, razorpayKeyId, order: dbOrder } = result;
       const options = {
@@ -131,11 +127,20 @@ export default function CheckoutPage() {
     }
   };
 
+  useEffect(() => {
+    if (cartItems.length === 0 && actionStatus !== "loading") {
+      const timer = setTimeout(() => {
+        router.push("/cart");
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [cartItems, router, actionStatus]);
+
   if (cartItems.length === 0) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4">Redirecting to cart...</p>
+        <p className="ml-4">Your cart is empty. Redirecting to cart...</p>
       </div>
     );
   }
@@ -206,20 +211,18 @@ export default function CheckoutPage() {
               >
                 {actionStatus === "loading" ? (
                   <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />{" "}
                     Processing...
                   </>
                 ) : (
                   <>
-                    <Lock className="h-5 w-5" />
-                    Proceed to Payment
+                    <Lock className="h-5 w-5" /> Proceed to Payment
                   </>
                 )}
               </Button>
             </div>
           </div>
           <div className="mt-10 lg:mt-0">
-            {/* --- YAHAN BADLAV KIYA GAYA HAI: ORDER SUMMARY --- */}
             <div className="bg-white p-8 rounded-lg shadow-md border lg:sticky lg:top-24">
               <h2 className="text-lg font-medium text-gray-900">
                 Order summary
@@ -278,7 +281,6 @@ export default function CheckoutPage() {
                 </div>
               </div>
             </div>
-            {/* --- END OF CHANGES --- */}
           </div>
         </div>
       </div>

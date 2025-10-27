@@ -36,14 +36,14 @@ import {
   X,
 } from "lucide-react";
 
-// --- YAHAN BADLAV KIYA GAYA HAI ---
+// --- MODIFIED ---
+// Initial state for manual form
 const initialManualState = {
   name: "",
   sku: "",
   description: "",
   price: "",
-  originalPrice: "",
-  tax: "", // Tax field added
+  originalPrice: "", // Added this field
   stockQuantity: "",
   category: "Rings",
   metalType: "Gold",
@@ -62,12 +62,15 @@ export default function AddInventoryPage() {
     (state: RootState) => state.jewelry
   );
 
+  // Manual form state
   const [manualForm, setManualForm] = useState(initialManualState);
   const [imageInput, setImageInput] = useState("");
 
+  // CSV upload state
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvMapping, setCsvMapping] = useState<Record<string, string>>({});
 
+  // Handle status changes
   useEffect(() => {
     if (actionStatus === "succeeded") {
       toast.success("Inventory operation successful!");
@@ -76,6 +79,8 @@ export default function AddInventoryPage() {
       setCsvFile(null);
       setCsvMapping({});
       dispatch(clearCsvHeaders());
+      // Optional: redirect
+      // router.push("/admin/inventory");
     }
     if (actionStatus === "failed" && error) {
       toast.error(error);
@@ -83,6 +88,7 @@ export default function AddInventoryPage() {
     }
   }, [actionStatus, error, dispatch, router]);
 
+  // Manual form handlers
   const handleManualChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -116,11 +122,12 @@ export default function AddInventoryPage() {
     if (!manualForm.name || !manualForm.sku || !manualForm.price) {
       return toast.error("Name, SKU, and Price are required!");
     }
+
     if (manualForm.images.length === 0) {
       return toast.error("At least one image URL is required!");
     }
 
-    // --- YAHAN BADLAV KIYA GAYA HAI ---
+    // --- MODIFIED ---
     const jewelryData = {
       name: manualForm.name,
       sku: manualForm.sku,
@@ -128,8 +135,7 @@ export default function AddInventoryPage() {
       price: parseFloat(manualForm.price),
       originalPrice: manualForm.originalPrice
         ? parseFloat(manualForm.originalPrice)
-        : undefined,
-      tax: manualForm.tax ? parseFloat(manualForm.tax) : 0, // Add tax field
+        : undefined, // Add originalPrice if it exists
       stockQuantity: parseInt(manualForm.stockQuantity) || 1,
       category: manualForm.category as any,
       images: manualForm.images,
@@ -147,11 +153,14 @@ export default function AddInventoryPage() {
     dispatch(addJewelry(jewelryData));
   };
 
+  // --- MODIFIED CSV FLOW ---
+  // CSV handlers for direct upload
   const handleCsvFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setCsvFile(file);
-      setCsvMapping({});
+      setCsvMapping({}); // Reset mapping on new file
+      // Automatically preview headers to show mapping options
       dispatch(previewCsvHeaders(file));
     }
   };
@@ -162,12 +171,19 @@ export default function AddInventoryPage() {
 
   const handleCsvSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!csvFile) return toast.error("Please select a CSV file!");
-    if (Object.keys(csvMapping).length === 0) return toast.error("Please map at least one field!");
-    
+
+    if (!csvFile) {
+      return toast.error("Please select a CSV file!");
+    }
+
+    if (Object.keys(csvMapping).length === 0) {
+      return toast.error("Please map at least one field!");
+    }
+
+    // Check if at least SKU or Name is mapped
     const mappedValues = Object.values(csvMapping);
     if (!mappedValues.includes("sku") && !mappedValues.includes("name")) {
-        return toast.error("You must map either 'SKU' or 'Name' field.");
+      return toast.error("You must map either 'SKU' or 'Name' field.");
     }
 
     dispatch(uploadCsv({ file: csvFile, mapping: csvMapping }));
@@ -175,6 +191,7 @@ export default function AddInventoryPage() {
 
   const isLoading = actionStatus === "loading";
 
+  // Render helper functions
   const renderInputField = (
     name: keyof typeof initialManualState,
     label: string,
@@ -232,14 +249,13 @@ export default function AddInventoryPage() {
     </div>
   );
 
-  // --- YAHAN BADLAV KIYA GAYA HAI ---
+  // --- MODIFIED ---
   const modelFields = [
     { value: "name", label: "Name" },
     { value: "sku", label: "SKU" },
     { value: "description", label: "Description" },
     { value: "price", label: "Price (Discounted)" },
-    { value: "originalPrice", label: "Original Price" },
-    { value: "tax", label: "Tax (%)" }, // Tax added for CSV mapping
+    { value: "originalPrice", label: "Original Price" }, // Added for mapping
     { value: "stockQuantity", label: "Stock Quantity" },
     { value: "category", label: "Category" },
     { value: "metal.type", label: "Metal Type" },
@@ -279,104 +295,233 @@ export default function AddInventoryPage() {
               </TabsTrigger>
             </TabsList>
 
+            {/* Manual Entry Tab */}
             <TabsContent value="manual" className="mt-6">
               <form onSubmit={handleManualSubmit}>
                 <ScrollArea className="h-[60vh] pr-4">
                   <div className="space-y-8 p-1">
+                    {/* Essential Information */}
                     <div className="p-6 rounded-lg border bg-gray-50">
                       <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                        <Gem className="h-5 w-5 text-orange-500" /> Essential Information
+                        <Gem className="h-5 w-5 text-orange-500" /> Essential
+                        Information
                       </h3>
-                      {/* --- YAHAN BADLAV KIYA GAYA HAI --- */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {renderInputField("name", "Jewelry Name", "text", true)}
                         {renderInputField("sku", "SKU", "text", true)}
-                        {renderInputField("price", "Price (INR)", "number", true, "e.g., 45000")}
-                        {renderInputField("originalPrice", "Original Price (Optional)", "number", false, "e.g., 50000")}
-                        {renderInputField("tax", "Tax (%)", "number", false, "e.g., 3")}
-                        {renderInputField("stockQuantity", "Stock Quantity", "number")}
-                        {renderSelectField("category", "Category", ["Rings", "New Arrivals", "Necklaces", "Earrings", "Bracelets", "Gifts"], true)}
+                        {renderInputField(
+                          "price",
+                          "Price (INR)",
+                          "number",
+                          true,
+                          "e.g., 45000"
+                        )}
+                        {/* --- NEW FIELD ADDED --- */}
+                        {renderInputField(
+                          "originalPrice",
+                          "Original Price (Optional)",
+                          "number",
+                          false,
+                          "e.g., 50000"
+                        )}
+                        {renderInputField(
+                          "stockQuantity",
+                          "Stock Quantity",
+                          "number"
+                        )}
+                        {renderSelectField(
+                          "category",
+                          "Category",
+                          [
+                            "Rings",
+                            "New Arrivals",
+                            "Necklaces",
+                            "Earrings",
+                            "Bracelets",
+                            "Gifts",
+                          ],
+                          true
+                        )}
                       </div>
                       <div className="mt-4">
                         <Label htmlFor="description">
                           Description <span className="text-red-500">*</span>
                         </Label>
-                        <Textarea name="description" id="description" value={manualForm.description} onChange={handleManualChange} required disabled={isLoading} rows={3} className="mt-2" />
+                        <Textarea
+                          name="description"
+                          id="description"
+                          value={manualForm.description}
+                          onChange={handleManualChange}
+                          required
+                          disabled={isLoading}
+                          rows={3}
+                          className="mt-2"
+                        />
                       </div>
                     </div>
 
+                    {/* Metal Details */}
                     <div className="p-6 rounded-lg border bg-gray-50">
                       <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                        <Sparkles className="h-5 w-5 text-orange-500" /> Metal Details
+                        <Sparkles className="h-5 w-5 text-orange-500" /> Metal
+                        Details
                       </h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {renderSelectField("metalType", "Metal Type", ["Gold", "Silver", "Platinum"], true)}
-                        {renderInputField("metalPurity", "Purity (e.g., 18K)", "text", true)}
+                        {renderSelectField(
+                          "metalType",
+                          "Metal Type",
+                          ["Gold", "Silver", "Platinum"],
+                          true
+                        )}
+                        {renderInputField(
+                          "metalPurity",
+                          "Purity (e.g., 18K)",
+                          "text",
+                          true
+                        )}
                         {renderInputField("metalColor", "Color")}
-                        {renderInputField("metalWeightInGrams", "Weight (grams)", "number", true)}
+                        {renderInputField(
+                          "metalWeightInGrams",
+                          "Weight (grams)",
+                          "number",
+                          true
+                        )}
                       </div>
                     </div>
 
+                    {/* Images */}
                     <div className="p-6 rounded-lg border bg-gray-50">
                       <h3 className="text-lg font-semibold text-gray-800 mb-4">
                         Product Images <span className="text-red-500">*</span>
                       </h3>
                       <div className="flex gap-2 mb-4">
-                        <Input type="url" placeholder="Enter image URL" value={imageInput} onChange={(e) => setImageInput(e.target.value)} disabled={isLoading} />
-                        <Button type="button" onClick={handleAddImage} disabled={isLoading}>Add</Button>
+                        <Input
+                          type="url"
+                          placeholder="Enter image URL"
+                          value={imageInput}
+                          onChange={(e) => setImageInput(e.target.value)}
+                          disabled={isLoading}
+                        />
+                        <Button
+                          type="button"
+                          onClick={handleAddImage}
+                          disabled={isLoading}
+                        >
+                          Add
+                        </Button>
                       </div>
                       {manualForm.images.length > 0 && (
                         <div className="space-y-2">
                           {manualForm.images.map((img, index) => (
-                            <div key={index} className="flex items-center gap-2 p-2 bg-white rounded border">
-                              <span className="flex-1 text-sm truncate">{img}</span>
-                              <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveImage(index)} disabled={isLoading}><X className="h-4 w-4" /></Button>
+                            <div
+                              key={index}
+                              className="flex items-center gap-2 p-2 bg-white rounded border"
+                            >
+                              <span className="flex-1 text-sm truncate">
+                                {img}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveImage(index)}
+                                disabled={isLoading}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
                             </div>
                           ))}
                         </div>
                       )}
                     </div>
 
+                    {/* Tags */}
                     <div className="p-6 rounded-lg border bg-gray-50">
                       <Label htmlFor="tags">Tags (comma-separated)</Label>
-                      <Input name="tags" id="tags" value={manualForm.tags} onChange={handleManualChange} placeholder="e.g., wedding, bridal, luxury" disabled={isLoading} className="mt-2" />
+                      <Input
+                        name="tags"
+                        id="tags"
+                        value={manualForm.tags}
+                        onChange={handleManualChange}
+                        placeholder="e.g., wedding, bridal, luxury"
+                        disabled={isLoading}
+                        className="mt-2"
+                      />
                     </div>
                   </div>
                 </ScrollArea>
 
                 <div className="pt-6 border-t mt-6">
-                  <Button type="submit" className="w-full h-12 text-base bg-orange-500 hover:bg-orange-600" disabled={isLoading}>
+                  <Button
+                    type="submit"
+                    className="w-full h-12 text-base bg-orange-500 hover:bg-orange-600"
+                    disabled={isLoading}
+                  >
                     {isLoading ? "Adding..." : "Add Jewelry to Inventory"}
                   </Button>
                 </div>
               </form>
             </TabsContent>
-            
+
+            {/* CSV Upload Tab (Simplified Flow) */}
             <TabsContent value="csv" className="mt-6">
               <form onSubmit={handleCsvSubmit}>
                 <div className="space-y-6">
+                  {/* File Upload */}
                   <div className="p-6 rounded-lg border bg-gray-50">
-                    <h3 className="text-lg font-semibold mb-4">1. Upload CSV File</h3>
-                    <Input type="file" accept=".csv" onChange={handleCsvFileChange} disabled={isLoading} />
-                    {csvFile && <p className="text-sm text-gray-600 mt-2">Selected: {csvFile.name}</p>}
+                    <h3 className="text-lg font-semibold mb-4">
+                      1. Upload CSV File
+                    </h3>
+                    <Input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleCsvFileChange}
+                      disabled={isLoading}
+                    />
+                    {csvFile && (
+                      <p className="text-sm text-gray-600 mt-2">
+                        Selected: {csvFile.name}
+                      </p>
+                    )}
                   </div>
 
+                  {/* Field Mapping */}
                   {csvHeaders.length > 0 && (
                     <div className="p-6 rounded-lg border bg-gray-50">
-                      <h3 className="text-lg font-semibold mb-4">2. Map CSV Fields to Database</h3>
+                      <h3 className="text-lg font-semibold mb-4">
+                        2. Map CSV Fields to Database
+                      </h3>
                       <ScrollArea className="h-96">
                         <div className="space-y-4">
                           {csvHeaders.map((csvField) => (
-                            <div key={csvField} className="grid grid-cols-2 gap-4 items-center">
-                              <div className="font-medium text-sm">{csvField}</div>
-                              <Select value={csvMapping[csvField] || ""} onValueChange={(value) => handleMappingChange(csvField, value)} disabled={isLoading}>
+                            <div
+                              key={csvField}
+                              className="grid grid-cols-2 gap-4 items-center"
+                            >
+                              <div className="font-medium text-sm">
+                                {csvField}
+                              </div>
+                              <Select
+                                value={csvMapping[csvField] || ""}
+                                onValueChange={(value) =>
+                                  handleMappingChange(csvField, value)
+                                }
+                                disabled={isLoading}
+                              >
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select field" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="">-- Skip Column --</SelectItem>
+                                  <SelectItem value="">
+                                    -- Skip Column --
+                                  </SelectItem>
                                   {modelFields.map((field) => (
-                                    <SelectItem key={field.value} value={field.value}>{field.label}</SelectItem>
+                                    <SelectItem
+                                      key={field.value}
+                                      value={field.value}
+                                    >
+                                      {field.label}
+                                    </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
@@ -387,16 +532,37 @@ export default function AddInventoryPage() {
                     </div>
                   )}
 
+                  {/* Submit Button */}
                   {csvHeaders.length > 0 && (
                     <div>
-                      <h3 className="text-lg font-semibold mb-4">3. Upload Data</h3>
-                      <Button type="submit" className="w-full h-12 bg-orange-500 hover:bg-orange-600" disabled={isLoading || !csvFile}>
+                      <h3 className="text-lg font-semibold mb-4">
+                        3. Upload Data
+                      </h3>
+                      <Button
+                        type="submit"
+                        className="w-full h-12 bg-orange-500 hover:bg-orange-600"
+                        disabled={isLoading || !csvFile}
+                      >
                         {isLoading ? "Uploading..." : "Upload and Process CSV"}
                       </Button>
                     </div>
                   )}
                 </div>
               </form>
+            </TabsContent>
+
+            {/* Placeholder Tabs */}
+            <TabsContent value="api_sync">
+              <div className="text-center py-20 text-gray-500 border-2 border-dashed rounded-lg mt-6">
+                <h3 className="text-lg font-semibold">API Sync</h3>
+                <p className="text-sm mt-2">Coming soon...</p>
+              </div>
+            </TabsContent>
+            <TabsContent value="ftp">
+              <div className="text-center py-20 text-gray-500 border-2 border-dashed rounded-lg mt-6">
+                <h3 className="text-lg font-semibold">FTP Upload</h3>
+                <p className="text-sm mt-2">Coming soon...</p>
+              </div>
             </TabsContent>
           </Tabs>
         </CardContent>

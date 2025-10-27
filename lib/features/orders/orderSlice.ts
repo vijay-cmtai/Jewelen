@@ -1,6 +1,10 @@
+// lib/features/orders/orderSlice.ts
+
 import axios from "axios";
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "@/lib/store";
+
+// Interfaces (assuming they are correct as provided)
 interface PopulatedItem {
   _id: string;
   jewelry: {
@@ -36,6 +40,8 @@ export interface Order {
     | "Completed"
     | "Failed";
   createdAt: string;
+  shippingAddress: any; // Add shippingAddress to the Order interface for type safety
+  paymentInfo: any; // Add paymentInfo as well
 }
 interface MyOrdersState {
   data: Order[];
@@ -65,21 +71,31 @@ const initialState: OrderState = {
   singleError: null,
   actionError: null,
 };
+
 const API_URL = `${process.env.NEXT_PUBLIC_API_URL}/orders`;
+
+// ✅ createOrder THUNK (FIXED)
 export const createOrder = createAsyncThunk<
   { order: Order; razorpayOrder: any; razorpayKeyId: string },
-  { addressId: string; items: any[] }, // Ab hum items bhi pass karenge
+  // <-- FIX 1: Add totalAmount to the type definition
+  { addressId: string; items: any[]; totalAmount: number },
   { state: RootState; rejectValue: string }
 >(
   "orders/create",
-  async ({ addressId, items }, { getState, rejectWithValue }) => {
+  // <-- FIX 2: Destructure totalAmount from the arguments
+  async ({ addressId, items, totalAmount }, { getState, rejectWithValue }) => {
     try {
       const token = getState().user.userInfo?.token;
       if (!token) return rejectWithValue("Not authorized");
 
       const config = { headers: { Authorization: `Bearer ${token}` } };
-      // Body mein addressId ke saath 'items' bhi bhejein
-      const { data } = await axios.post(API_URL, { addressId, items }, config);
+
+      // <-- FIX 3: Send totalAmount in the request body
+      const { data } = await axios.post(
+        API_URL,
+        { addressId, items, totalAmount }, // Pass all three fields
+        config
+      );
       return data;
     } catch (error: any) {
       return rejectWithValue(
@@ -88,6 +104,8 @@ export const createOrder = createAsyncThunk<
     }
   }
 );
+
+// ... (other thunks remain the same) ...
 export const verifyPayment = createAsyncThunk<
   { orderId: string },
   {
@@ -138,6 +156,7 @@ export const fetchMyOrders = createAsyncThunk<
     );
   }
 });
+
 export const fetchAllOrders = createAsyncThunk<
   Order[],
   void,
@@ -155,6 +174,7 @@ export const fetchAllOrders = createAsyncThunk<
     );
   }
 });
+
 export const fetchOrderById = createAsyncThunk<
   Order,
   string,
@@ -175,6 +195,7 @@ export const fetchOrderById = createAsyncThunk<
     );
   }
 });
+
 const orderSlice = createSlice({
   name: "orders",
   initialState,
@@ -200,7 +221,6 @@ const orderSlice = createSlice({
         state.actionStatus = "failed";
         state.actionError = action.payload as string;
       });
-
     builder
       .addCase(verifyPayment.pending, (state) => {
         state.actionStatus = "loading";
@@ -212,7 +232,6 @@ const orderSlice = createSlice({
         state.actionStatus = "failed";
         state.actionError = action.payload as string;
       });
-
     builder
       .addCase(fetchMyOrders.pending, (state) => {
         state.myOrders.status = "loading";
@@ -229,7 +248,6 @@ const orderSlice = createSlice({
         state.myOrders.status = "failed";
         state.myOrders.error = action.payload as string;
       });
-
     builder
       .addCase(fetchAllOrders.pending, (state) => {
         state.listStatus = "loading";
@@ -245,7 +263,6 @@ const orderSlice = createSlice({
         state.listStatus = "failed";
         state.listError = action.payload as string;
       });
-
     builder
       .addCase(fetchOrderById.pending, (state) => {
         state.singleStatus = "loading";
