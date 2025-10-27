@@ -10,18 +10,32 @@ import { generateSlug } from "@/lib/utils";
 export default function CartPage() {
   const { cartItems, removeFromCart, updateQuantity } = useAppContext();
 
-  // ✅ FIX: Humne .reduce() ko aur bhi safe bana diya hai.
-  // Ab yeh check karega ki item valid hai ya nahi, crash hone se pehle.
-  const subtotal =
-    cartItems?.reduce((acc, item) => {
-      // Agar item null, undefined, ya usmein price/quantity nahi hai, to use skip kar do.
-      if (!item || typeof item.price !== 'number' || typeof item.quantity !== 'number') {
-        return acc; // Current total ko waise hi aage bhej do
-      }
-      return acc + item.price * item.quantity;
-    }, 0) || 0; // Agar cartItems null hai to 0 use karo
+  // --- NAYI LOGIC: SABHI TOTALS CALCULATE KAREIN ---
+  const mrpTotal =
+    cartItems?.reduce(
+      (acc, item) =>
+        acc + (item?.originalPrice || item?.price || 0) * (item?.quantity || 0),
+      0
+    ) || 0;
 
-  const total = subtotal;
+  const discountedSubtotal =
+    cartItems?.reduce(
+      (acc, item) => acc + (item?.price || 0) * (item?.quantity || 0),
+      0
+    ) || 0;
+
+  const totalDiscount = mrpTotal - discountedSubtotal;
+
+  const totalTax =
+    cartItems?.reduce(
+      (acc, item) =>
+        acc +
+        ((item?.price || 0) * (item?.quantity || 0) * (item?.tax || 0)) / 100,
+      0
+    ) || 0;
+
+  const grandTotal = discountedSubtotal + totalTax;
+  // --------------------------------------------------
 
   if (!cartItems || cartItems.length === 0) {
     return (
@@ -57,14 +71,9 @@ export default function CartPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           <section className="lg:col-span-2 space-y-6">
             {cartItems.map((item) => {
-              // Extra safety check: Agar item null hai to kuch bhi render mat karo
               if (!item || !item._id) return null;
 
               const slug = generateSlug(item.name || "product", item._id);
-              const imageUrl = item.images?.[0] || "/placeholder-image.jpg";
-              const itemPrice = item.price || 0;
-              const itemQuantity = item.quantity || 0;
-
               return (
                 <div
                   key={item._id}
@@ -72,8 +81,8 @@ export default function CartPage() {
                 >
                   <Link href={`/product/${slug}`} className="flex-shrink-0">
                     <Image
-                      src={imageUrl}
-                      alt={item.name || "Product"}
+                      src={item.images?.[0] || ""}
+                      alt={item.name || ""}
                       width={120}
                       height={120}
                       className="rounded-md object-cover aspect-square"
@@ -86,11 +95,20 @@ export default function CartPage() {
                           {item.name || "Unnamed Product"}
                         </h3>
                       </Link>
-                      <p className="text-xl font-bold text-gray-900 mt-2">
-                        ₹{(itemPrice * itemQuantity).toLocaleString()}
-                      </p>
+                      <div className="flex items-baseline gap-2 mt-2">
+                        <p className="text-xl font-bold text-gray-900">
+                          ₹{(item.price * item.quantity).toLocaleString()}
+                        </p>
+                        {item.originalPrice && (
+                          <p className="text-sm text-gray-500 line-through">
+                            ₹
+                            {(
+                              item.originalPrice * item.quantity
+                            ).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
                     </div>
-
                     <div className="flex items-center border border-gray-200 rounded-full w-fit mt-4 sm:mt-0">
                       <Button
                         variant="ghost"
@@ -103,7 +121,7 @@ export default function CartPage() {
                         <Minus size={16} />
                       </Button>
                       <span className="w-10 text-center font-semibold">
-                        {itemQuantity}
+                        {item.quantity}
                       </span>
                       <Button
                         variant="ghost"
@@ -131,24 +149,27 @@ export default function CartPage() {
             })}
           </section>
 
+          {/* --- YAHAN BADLAV KIYA GAYA HAI: ORDER SUMMARY --- */}
           <section className="bg-white p-6 rounded-lg shadow-sm border h-fit lg:sticky lg:top-24">
             <h2 className="text-xl font-semibold border-b pb-4 mb-4">
               Order Summary
             </h2>
-            <div className="space-y-4 text-gray-600">
+            <div className="space-y-3 text-gray-600">
               <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span className="font-medium text-gray-900">
-                  ₹{subtotal.toLocaleString()}
-                </span>
+                <span>MRP Total</span>
+                <span>₹{mrpTotal.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-green-600">
+                <span>Discount on MRP</span>
+                <span>- ₹{totalDiscount.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
-                <span>Shipping</span>
-                <span className="font-medium text-green-600">Free</span>
+                <span>Taxes & Charges</span>
+                <span>₹{totalTax.toLocaleString()}</span>
               </div>
               <div className="border-t pt-4 mt-4 flex justify-between font-bold text-lg text-gray-900">
-                <span>Total</span>
-                <span>₹{total.toLocaleString()}</span>
+                <span>Grand Total</span>
+                <span>₹{grandTotal.toLocaleString()}</span>
               </div>
             </div>
             <Link href="/checkout" passHref>
@@ -157,6 +178,7 @@ export default function CartPage() {
               </Button>
             </Link>
           </section>
+          {/* --- END OF CHANGES --- */}
         </div>
       </div>
     </main>

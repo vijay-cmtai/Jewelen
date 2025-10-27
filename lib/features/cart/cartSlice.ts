@@ -1,19 +1,12 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import axios, { AxiosError } from "axios";
 import type { RootState } from "@/lib/store";
+import { JewelryItem } from "../jewelry/jewelrySlice";
 
-// Types ko yahin define kar rahe hain
-export interface JewelryItem {
-  _id: string;
-  name: string;
-  sku: string;
-  price: number;
-  images: string[];
-  slug: string;
-}
+// Ab humein local JewelryItem ki zaroorat nahi hai, use hata dein.
 
 export interface CartAPIItem {
-  jewelry: JewelryItem;
+  jewelry: JewelryItem; // Ab yeh poori definition istemal karega
   quantity: number;
   _id: string;
 }
@@ -33,6 +26,7 @@ const initialState: CartState = {
 const API_URL = `${process.env.NEXT_PUBLIC_API_URL}/cart`;
 const getToken = (state: RootState) => state.user.userInfo?.token;
 
+// ... baaki ke sabhi async thunks (fetchCart, addToCart, etc.) waise hi rahenge ...
 export const fetchCart = createAsyncThunk<
   CartAPIItem[],
   void,

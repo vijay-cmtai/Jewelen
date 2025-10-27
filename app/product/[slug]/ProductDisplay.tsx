@@ -12,15 +12,30 @@ export default function ProductDisplay({ product }: { product: JewelryItem }) {
   const [quantity, setQuantity] = useState(1);
   const { addToCart, addToWishlist, isItemInWishlist } = useAppContext();
 
+  // --- NAYI LOGIC: DISCOUNT AUR SAVINGS CALCULATE KAREIN ---
+  const discount = product.originalPrice
+    ? Math.round(
+        ((product.originalPrice - product.price) / product.originalPrice) * 100
+      )
+    : 0;
+
+  const savings = product.originalPrice
+    ? product.originalPrice - product.price
+    : 0;
+
   return (
     <div className="grid lg:grid-cols-2 gap-12 lg:gap-16">
       <div className="flex flex-col-reverse md:flex-row gap-4">
-        <div className="flex md:flex-col gap-3">
+        <div className="flex md:flex-col gap-3 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0">
           {product.images.map((src, i) => (
             <button
               key={i}
               onClick={() => setActiveImage(src)}
-              className={`relative aspect-square w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${activeImage === src ? "border-orange-500 scale-110" : "border-transparent hover:border-gray-300"}`}
+              className={`relative aspect-square w-16 h-16 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 ${
+                activeImage === src
+                  ? "border-orange-500 scale-110"
+                  : "border-transparent hover:border-gray-300"
+              }`}
             >
               <Image
                 src={src}
@@ -49,7 +64,6 @@ export default function ProductDisplay({ product }: { product: JewelryItem }) {
         </h1>
         <div className="flex items-center gap-2 mt-4">
           <div className="flex items-center text-yellow-400">
-            {/* Replace with actual rating if available */}
             {[...Array(5)].map((_, i) => (
               <Star
                 key={i}
@@ -59,18 +73,38 @@ export default function ProductDisplay({ product }: { product: JewelryItem }) {
               />
             ))}
           </div>
-          {/* Replace with actual reviews if available */}
           <span className="text-sm text-gray-500">(0 reviews)</span>
         </div>
         <p className="text-gray-600 mt-5 leading-relaxed">
           {product.description}
         </p>
-        <div className="mt-6 flex items-baseline gap-3">
-          <div className="text-4xl font-bold text-gray-900">
-            ₹{product.price.toLocaleString()}
+
+        {/* --- YAHAN BADLAV KIYA GAYA HAI: PRICE DISPLAY --- */}
+        <div className="mt-6">
+          <div className="flex items-baseline gap-3">
+            <span className="text-4xl font-bold text-gray-900">
+              ₹{product.price.toLocaleString()}
+            </span>
+            {product.originalPrice && (
+              <span className="text-2xl text-gray-400 line-through">
+                ₹{product.originalPrice.toLocaleString()}
+              </span>
+            )}
+            {discount > 0 && (
+              <span className="text-lg font-semibold text-green-600">
+                ({discount}% OFF)
+              </span>
+            )}
           </div>
-          {/* Add original price logic if needed */}
+          {savings > 0 && (
+            <p className="text-md font-semibold text-green-700 mt-2">
+              You save ₹{savings.toLocaleString()}!
+            </p>
+          )}
+          <p className="text-xs text-gray-500 mt-1">(Inclusive of all taxes)</p>
         </div>
+        {/* --- END OF CHANGES --- */}
+
         <div className="mt-8 flex items-center gap-4">
           <div className="flex items-center border border-gray-300 rounded-full">
             <Button
@@ -106,7 +140,11 @@ export default function ProductDisplay({ product }: { product: JewelryItem }) {
           >
             <Heart
               size={20}
-              className={`transition-all ${isItemInWishlist(product._id) ? "fill-red-500 text-red-500" : "text-gray-600"}`}
+              className={`transition-all ${
+                isItemInWishlist(product._id)
+                  ? "fill-red-500 text-red-500"
+                  : "text-gray-600"
+              }`}
             />
           </Button>
         </div>

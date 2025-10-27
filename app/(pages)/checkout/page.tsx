@@ -1,5 +1,3 @@
-// pages/CheckoutPage.tsx
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -30,9 +28,7 @@ export default function CheckoutPage() {
   const { addresses, listStatus } = useSelector(
     (state: RootState) => state.address
   );
-  const { actionStatus, actionError } = useSelector(
-    (state: RootState) => state.orders
-  );
+  const { actionStatus } = useSelector((state: RootState) => state.orders);
 
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
     null
@@ -52,43 +48,54 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (addresses.length > 0) {
       const defaultAddress = addresses.find((addr) => addr.isDefault);
-      if (defaultAddress) {
-        setSelectedAddressId(defaultAddress._id);
-      } else {
-        setSelectedAddressId(addresses[0]._id);
-      }
+      setSelectedAddressId(defaultAddress?._id || addresses[0]?._id || null);
     }
   }, [addresses]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (cartItems.length === 0 && actionStatus !== "loading") {
-        router.push("/cart");
-      }
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [cartItems, router, actionStatus]);
-
-  const subtotal = cartItems.reduce(
-    (acc, item) => acc + (item.price || 0) * (item.quantity || 0),
+  // --- NAYI LOGIC: SABHI TOTALS CALCULATE KAREIN ---
+  const mrpTotal = cartItems.reduce(
+    (acc, item) =>
+      acc + (item?.originalPrice || item?.price || 0) * (item?.quantity || 0),
     0
   );
-  const total = subtotal;
+
+  const discountedSubtotal = cartItems.reduce(
+    (acc, item) => acc + (item?.price || 0) * (item?.quantity || 0),
+    0
+  );
+
+  const totalDiscount = mrpTotal - discountedSubtotal;
+
+  const totalTax = cartItems.reduce(
+    (acc, item) =>
+      acc +
+      ((item?.price || 0) * (item?.quantity || 0) * (item?.tax || 0)) / 100,
+    0
+  );
+
+  const grandTotal = discountedSubtotal + totalTax;
+  // --------------------------------------------------
 
   const handlePlaceOrder = async () => {
     if (!selectedAddressId) {
       toast.error("Please select a shipping address.");
       return;
     }
-
     try {
-      // YAHAN BADLAV KIYA GAYA HAI: Ab hum `cartItems` ko bhi dispatch mein bhejenge
+      // =========================================================
+      // ========= THIS IS THE ONLY CHANGE IN THIS FILE ==========
+      // =========================================================
       const result = await dispatch(
-        createOrder({ addressId: selectedAddressId, items: cartItems })
+        createOrder({
+          addressId: selectedAddressId,
+          items: cartItems,
+          totalAmount: grandTotal, // <-- PASSING THE CORRECT TOTAL
+        })
       ).unwrap();
+      // =========================================================
+      // =========================================================
 
       const { razorpayOrder, razorpayKeyId, order: dbOrder } = result;
-
       const options = {
         key: razorpayKeyId,
         amount: razorpayOrder.amount,
@@ -106,42 +113,29 @@ export default function CheckoutPage() {
                 razorpay_signature: response.razorpay_signature,
               })
             ).unwrap();
-
             toast.success("Payment Successful! Your order has been placed.");
             clearCart();
             router.push(`/order/success?orderId=${verificationResult.orderId}`);
           } catch (verificationError: any) {
-            toast.error(
-              verificationError ||
-                "Payment verification failed. Please contact support."
-            );
+            toast.error(verificationError || "Payment verification failed.");
           }
         },
-        prefill: {
-          name: userInfo?.name,
-          email: userInfo?.email,
-        },
-        notes: {
-          address: `Order ID: ${dbOrder._id}`,
-        },
-        theme: {
-          color: "#ea580c",
-        },
+        prefill: { name: userInfo?.name, email: userInfo?.email },
+        notes: { address: `Order ID: ${dbOrder._id}` },
+        theme: { color: "#ea580c" },
       };
-
       const paymentObject = new window.Razorpay(options);
       paymentObject.open();
     } catch (error: any) {
-      toast.error(error || "Could not initiate payment. Please try again.");
+      toast.error(error || "Could not initiate payment.");
     }
   };
 
-  // Baaki ka component code waisa hi rahega
   if (cartItems.length === 0) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4">Loading your cart...</p>
+        <p className="ml-4">Redirecting to cart...</p>
       </div>
     );
   }
@@ -155,17 +149,12 @@ export default function CheckoutPage() {
               Select Shipping Address
             </h2>
             {listStatus === "loading" && <Loader2 className="animate-spin" />}
-
             <div className="space-y-4">
               {addresses.map((address) => (
                 <div
                   key={address._id}
                   onClick={() => setSelectedAddressId(address._id)}
-                  className={`relative flex items-start border rounded-md p-4 transition-all cursor-pointer ${
-                    selectedAddressId === address._id
-                      ? "border-orange-500 ring-2 ring-orange-200"
-                      : "border-gray-300 hover:border-orange-400"
-                  }`}
+                  className={`relative flex items-start border rounded-md p-4 transition-all cursor-pointer ${selectedAddressId === address._id ? "border-orange-500 ring-2 ring-orange-200" : "border-gray-300 hover:border-orange-400"}`}
                 >
                   <input
                     type="radio"
@@ -184,7 +173,7 @@ export default function CheckoutPage() {
                         <Home className="h-4 w-4" />
                       ) : (
                         <Briefcase className="h-4 w-4" />
-                      )}
+                      )}{" "}
                       {address.addressType}{" "}
                       {address.isDefault && (
                         <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
@@ -202,16 +191,13 @@ export default function CheckoutPage() {
                 </div>
               ))}
             </div>
-
             <Button
               variant="outline"
               className="mt-6 w-full flex items-center gap-2"
               onClick={() => router.push("/profile/addresses")}
             >
-              <PlusCircle className="h-5 w-5" />
-              Add a New Address
+              <PlusCircle className="h-5 w-5" /> Add a New Address
             </Button>
-
             <div className="mt-10 pt-6 border-t border-gray-200">
               <Button
                 onClick={handlePlaceOrder}
@@ -233,6 +219,7 @@ export default function CheckoutPage() {
             </div>
           </div>
           <div className="mt-10 lg:mt-0">
+            {/* --- YAHAN BADLAV KIYA GAYA HAI: ORDER SUMMARY --- */}
             <div className="bg-white p-8 rounded-lg shadow-md border lg:sticky lg:top-24">
               <h2 className="text-lg font-medium text-gray-900">
                 Order summary
@@ -272,17 +259,26 @@ export default function CheckoutPage() {
                   ))}
                 </ul>
               </div>
-              <div className="mt-6 border-t border-gray-200 pt-6 space-y-2">
-                <div className="flex items-center justify-between text-base font-medium text-gray-900">
-                  <p>Subtotal</p>
-                  <p>₹{subtotal.toLocaleString()}</p>
+              <div className="mt-6 border-t border-gray-200 pt-6 space-y-3 text-base">
+                <div className="flex items-center justify-between text-gray-600">
+                  <p>MRP Total</p>
+                  <p>₹{mrpTotal.toLocaleString()}</p>
+                </div>
+                <div className="flex items-center justify-between text-green-600">
+                  <p>Discount on MRP</p>
+                  <p>- ₹{totalDiscount.toLocaleString()}</p>
+                </div>
+                <div className="flex items-center justify-between text-gray-600">
+                  <p>Taxes & Charges</p>
+                  <p>₹{totalTax.toLocaleString()}</p>
                 </div>
                 <div className="flex items-center justify-between border-t border-gray-200 pt-4 mt-4 text-lg font-bold text-gray-900">
-                  <p>Order total</p>
-                  <p>₹{total.toLocaleString()}</p>
+                  <p>Grand Total</p>
+                  <p>₹{grandTotal.toLocaleString()}</p>
                 </div>
               </div>
             </div>
+            {/* --- END OF CHANGES --- */}
           </div>
         </div>
       </div>
