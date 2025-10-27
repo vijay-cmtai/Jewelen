@@ -44,11 +44,12 @@ export default function SignUpPage() {
       dispatch(resetActionStatus());
     }
     if (actionStatus === "succeeded") {
-      toast.success("Registration successful! Redirecting...");
-      router.push("/signin");
+      toast.success("Registration successful! Please verify your OTP.");
+      // Redirect to OTP page with email in query
+      router.push(`/verify-otp?email=${encodeURIComponent(formData.email)}`);
       dispatch(resetActionStatus());
     }
-  }, [actionStatus, error, dispatch, router]);
+  }, [actionStatus, error, dispatch, router, formData.email]);
 
   const userTypes = [
     {
@@ -96,6 +97,8 @@ export default function SignUpPage() {
 
     dispatch(registerUser(registrationData));
   }
+
+  const isLoading = actionStatus === "loading";
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-12">
@@ -199,9 +202,9 @@ export default function SignUpPage() {
             <Button
               type="submit"
               className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold"
-              disabled={actionStatus === "loading"}
+              disabled={isLoading}
             >
-              {actionStatus === "loading" ? "Registering..." : "Create Account"}
+              {isLoading ? "Registering..." : "Create Account"}
             </Button>
 
             <p className="text-center text-sm text-gray-600">

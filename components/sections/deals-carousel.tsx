@@ -34,12 +34,10 @@ export default function DealsCarousel() {
 
   useEffect(() => {
     if (allProducts.length > 0) {
-      // Step 1: Filter products with deals (products on sale)
       let filteredItems = allProducts.filter(
         (p) => p.originalPrice && p.originalPrice > p.price
       );
 
-      // Step 2: If no deals found, show all products as fallback
       if (filteredItems.length === 0) {
         console.log(
           "No specific deals found. Showing latest products as fallback."
@@ -47,7 +45,6 @@ export default function DealsCarousel() {
         filteredItems = allProducts;
       }
 
-      // Step 3: Show only first 8 items
       setItemsToShow(filteredItems.slice(0, 8));
     }
   }, [allProducts]);
@@ -64,7 +61,6 @@ export default function DealsCarousel() {
     );
   }
 
-  // Return null only when no products are available from backend
   if (itemsToShow.length === 0) {
     return null;
   }
@@ -118,6 +114,10 @@ export default function DealsCarousel() {
               )
             : 0;
 
+          const savings = product.originalPrice
+            ? product.originalPrice - product.price
+            : 0;
+
           const slug = generateSlug(product.name, product._id);
 
           return (
@@ -160,16 +160,27 @@ export default function DealsCarousel() {
                     </h3>
                   </Link>
 
+                  {/* --- PRICE DISPLAY LOGIC --- */}
                   <div className="flex items-baseline gap-3 mb-3">
+                    {/* YEH NAYI (DISCOUNTED) PRICE HAI */}
                     <span className="text-2xl font-bold text-gray-900">
                       ₹{product.price.toLocaleString()}
                     </span>
+
+                    {/* YEH PURANI (ORIGINAL) PRICE HAI, JO KATI HUI DIKHEGI */}
                     {product.originalPrice && (
                       <span className="text-base text-gray-500 line-through">
                         ₹{product.originalPrice.toLocaleString()}
                       </span>
                     )}
                   </div>
+                  {/* --- END OF PRICE DISPLAY LOGIC --- */}
+
+                  {savings > 0 && (
+                    <div className="mt-2 text-sm text-green-600 font-semibold">
+                      You save ₹{savings.toLocaleString()}
+                    </div>
+                  )}
 
                   <button
                     onClick={() => addToCart(product._id)}

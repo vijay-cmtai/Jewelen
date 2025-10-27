@@ -36,12 +36,14 @@ import {
   X,
 } from "lucide-react";
 
+// --- MODIFIED ---
 // Initial state for manual form
 const initialManualState = {
   name: "",
   sku: "",
   description: "",
   price: "",
+  originalPrice: "", // Added this field
   stockQuantity: "",
   category: "Rings",
   metalType: "Gold",
@@ -67,17 +69,15 @@ export default function AddInventoryPage() {
   // CSV upload state
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvMapping, setCsvMapping] = useState<Record<string, string>>({});
-  const [showMapping, setShowMapping] = useState(false);
 
   // Handle status changes
   useEffect(() => {
     if (actionStatus === "succeeded") {
-      toast.success("Inventory added successfully!");
+      toast.success("Inventory operation successful!");
       dispatch(resetActionStatus());
       setManualForm(initialManualState);
       setCsvFile(null);
       setCsvMapping({});
-      setShowMapping(false);
       dispatch(clearCsvHeaders());
       // Optional: redirect
       // router.push("/admin/inventory");
@@ -127,11 +127,15 @@ export default function AddInventoryPage() {
       return toast.error("At least one image URL is required!");
     }
 
+    // --- MODIFIED ---
     const jewelryData = {
       name: manualForm.name,
       sku: manualForm.sku,
       description: manualForm.description,
       price: parseFloat(manualForm.price),
+      originalPrice: manualForm.originalPrice
+        ? parseFloat(manualForm.originalPrice)
+        : undefined, // Add originalPrice if it exists
       stockQuantity: parseInt(manualForm.stockQuantity) || 1,
       category: manualForm.category as any,
       images: manualForm.images,
@@ -149,28 +153,17 @@ export default function AddInventoryPage() {
     dispatch(addJewelry(jewelryData));
   };
 
-  // CSV handlers
+  // --- MODIFIED CSV FLOW ---
+  // CSV handlers for direct upload
   const handleCsvFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setCsvFile(file);
-      // Preview headers
+      setCsvMapping({}); // Reset mapping on new file
+      // Automatically preview headers to show mapping options
       dispatch(previewCsvHeaders(file));
-      setShowMapping(false);
     }
   };
-
-  const handlePreviewHeaders = () => {
-    if (csvFile) {
-      dispatch(previewCsvHeaders(csvFile));
-    }
-  };
-
-  useEffect(() => {
-    if (csvHeaders.length > 0) {
-      setShowMapping(true);
-    }
-  }, [csvHeaders]);
 
   const handleMappingChange = (csvField: string, modelField: string) => {
     setCsvMapping((prev) => ({ ...prev, [csvField]: modelField }));
@@ -187,6 +180,12 @@ export default function AddInventoryPage() {
       return toast.error("Please map at least one field!");
     }
 
+    // Check if at least SKU or Name is mapped
+    const mappedValues = Object.values(csvMapping);
+    if (!mappedValues.includes("sku") && !mappedValues.includes("name")) {
+      return toast.error("You must map either 'SKU' or 'Name' field.");
+    }
+
     dispatch(uploadCsv({ file: csvFile, mapping: csvMapping }));
   };
 
@@ -197,7 +196,8 @@ export default function AddInventoryPage() {
     name: keyof typeof initialManualState,
     label: string,
     type = "text",
-    required = false
+    required = false,
+    placeholder?: string
   ) => (
     <div className="space-y-2">
       <Label htmlFor={name}>
@@ -212,6 +212,7 @@ export default function AddInventoryPage() {
         onChange={handleManualChange}
         required={required}
         disabled={isLoading}
+        placeholder={placeholder}
       />
     </div>
   );
@@ -248,16 +249,20 @@ export default function AddInventoryPage() {
     </div>
   );
 
+  // --- MODIFIED ---
   const modelFields = [
     { value: "name", label: "Name" },
     { value: "sku", label: "SKU" },
     { value: "description", label: "Description" },
-    { value: "price", label: "Price" },
+    { value: "price", label: "Price (Discounted)" },
+    { value: "originalPrice", label: "Original Price" }, // Added for mapping
     { value: "stockQuantity", label: "Stock Quantity" },
     { value: "category", label: "Category" },
     { value: "metal.type", label: "Metal Type" },
     { value: "metal.purity", label: "Metal Purity" },
     { value: "metal.weightInGrams", label: "Metal Weight" },
+    { value: "images", label: "Images (comma-separated URLs)" },
+    { value: "tags", label: "Tags (comma-separated)" },
   ];
 
   return (
@@ -308,7 +313,16 @@ export default function AddInventoryPage() {
                           "price",
                           "Price (INR)",
                           "number",
-                          true
+                          true,
+                          "e.g., 45000"
+                        )}
+                        {/* --- NEW FIELD ADDED --- */}
+                        {renderInputField(
+                          "originalPrice",
+                          "Original Price (Optional)",
+                          "number",
+                          false,
+                          "e.g., 50000"
                         )}
                         {renderInputField(
                           "stockQuantity",
@@ -449,14 +463,14 @@ export default function AddInventoryPage() {
               </form>
             </TabsContent>
 
-            {/* CSV Upload Tab */}
+            {/* CSV Upload Tab (Simplified Flow) */}
             <TabsContent value="csv" className="mt-6">
               <form onSubmit={handleCsvSubmit}>
                 <div className="space-y-6">
                   {/* File Upload */}
                   <div className="p-6 rounded-lg border bg-gray-50">
                     <h3 className="text-lg font-semibold mb-4">
-                      Upload CSV File
+                      1. Upload CSV File
                     </h3>
                     <Input
                       type="file"
@@ -471,22 +485,11 @@ export default function AddInventoryPage() {
                     )}
                   </div>
 
-                  {/* Preview Headers Button */}
-                  {csvFile && !showMapping && (
-                    <Button
-                      type="button"
-                      onClick={handlePreviewHeaders}
-                      disabled={isLoading}
-                    >
-                      Preview Headers
-                    </Button>
-                  )}
-
                   {/* Field Mapping */}
-                  {showMapping && csvHeaders.length > 0 && (
+                  {csvHeaders.length > 0 && (
                     <div className="p-6 rounded-lg border bg-gray-50">
                       <h3 className="text-lg font-semibold mb-4">
-                        Map CSV Fields to Database Fields
+                        2. Map CSV Fields to Database
                       </h3>
                       <ScrollArea className="h-96">
                         <div className="space-y-4">
@@ -509,7 +512,9 @@ export default function AddInventoryPage() {
                                   <SelectValue placeholder="Select field" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="">Skip</SelectItem>
+                                  <SelectItem value="">
+                                    -- Skip Column --
+                                  </SelectItem>
                                   {modelFields.map((field) => (
                                     <SelectItem
                                       key={field.value}
@@ -528,14 +533,19 @@ export default function AddInventoryPage() {
                   )}
 
                   {/* Submit Button */}
-                  {showMapping && (
-                    <Button
-                      type="submit"
-                      className="w-full h-12 bg-orange-500 hover:bg-orange-600"
-                      disabled={isLoading || !csvFile}
-                    >
-                      {isLoading ? "Uploading..." : "Upload CSV Data"}
-                    </Button>
+                  {csvHeaders.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">
+                        3. Upload Data
+                      </h3>
+                      <Button
+                        type="submit"
+                        className="w-full h-12 bg-orange-500 hover:bg-orange-600"
+                        disabled={isLoading || !csvFile}
+                      >
+                        {isLoading ? "Uploading..." : "Upload and Process CSV"}
+                      </Button>
+                    </div>
                   )}
                 </div>
               </form>

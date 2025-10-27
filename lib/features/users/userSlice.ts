@@ -70,39 +70,41 @@ const initialState: UserState = {
 
 const API_URL = `${process.env.NEXT_PUBLIC_API_URL}/auth`;
 
-const getAuthConfig = (token: string) => ({
-  headers: {
-    Authorization: `Bearer ${token}`,
-  },
-});
-
-const getMultipartConfig = (token: string) => ({
-  headers: {
-    "Content-Type": "multipart/form-data",
-    Authorization: `Bearer ${token}`,
-  },
-});
-
 export const registerUser = createAsyncThunk<
-  UserInfo,
+  { success: boolean; message: string },
   FormData,
   { rejectValue: string }
 >("user/register", async (userData, { rejectWithValue }) => {
   try {
-    const { data } = await axios.post<UserInfo>(
+    const { data } = await axios.post<{ success: boolean; message: string }>(
       `${API_URL}/register`,
       userData
     );
-    const userInfoWithAdmin = {
-      ...data,
-      isAdmin: data.role === "Admin",
-    };
+    return data;
+  } catch (error: any) {
+    return rejectWithValue(
+      error.response?.data?.message || "Registration failed"
+    );
+  }
+});
+
+export const verifyOtp = createAsyncThunk<
+  UserInfo,
+  { email: string; otp: string },
+  { rejectValue: string }
+>("user/verifyOtp", async (otpData, { rejectWithValue }) => {
+  try {
+    const { data } = await axios.post<UserInfo>(
+      `${API_URL}/verify-otp`,
+      otpData
+    );
+    const userInfoWithAdmin = { ...data, isAdmin: data.role === "Admin" };
     saveUserInfoToStorage(userInfoWithAdmin);
     return userInfoWithAdmin;
   } catch (error: any) {
-    const message =
-      error.response?.data?.message || error.message || "Registration failed";
-    return rejectWithValue(message);
+    return rejectWithValue(
+      error.response?.data?.message || "OTP verification failed"
+    );
   }
 });
 
@@ -120,106 +122,39 @@ export const loginUser = createAsyncThunk<
     saveUserInfoToStorage(userInfoWithAdmin);
     return userInfoWithAdmin;
   } catch (error: any) {
-    const message =
-      error.response?.data?.message || error.message || "Login failed";
-    return rejectWithValue(message);
+    return rejectWithValue(error.response?.data?.message || "Login failed");
   }
 });
 
-export const fetchAllUsers = createAsyncThunk<
-  UserInfo[],
-  void,
-  { state: RootState; rejectValue: string }
->("user/fetchAll", async (_, { getState, rejectWithValue }) => {
+export const forgotPassword = createAsyncThunk<
+  { success: boolean; message: string },
+  { email: string },
+  { rejectValue: string }
+>("user/forgotPassword", async ({ email }, { rejectWithValue }) => {
   try {
-    const token = getState().user.userInfo?.token;
-    if (!token) {
-      return rejectWithValue("Not authorized. Please login again.");
-    }
-    const config = getAuthConfig(token);
-    const { data } = await axios.get<UserInfo[]>(`${API_URL}/all`, config);
+    const { data } = await axios.post(`${API_URL}/forgot-password`, { email });
     return data;
   } catch (error: any) {
-    const message =
-      error.response?.data?.message || error.message || "Failed to fetch users";
-    return rejectWithValue(message);
-  }
-});
-
-export const fetchUserById = createAsyncThunk<
-  UserInfo,
-  string,
-  { state: RootState; rejectValue: string }
->("user/fetchById", async (userId, { getState, rejectWithValue }) => {
-  try {
-    const token = getState().user.userInfo?.token;
-    if (!token) {
-      return rejectWithValue("Not authorized. Please login again.");
-    }
-    const config = getAuthConfig(token);
-    const { data } = await axios.get<UserInfo>(`${API_URL}/${userId}`, config);
-    return data;
-  } catch (error: any) {
-    const message =
-      error.response?.data?.message ||
-      error.message ||
-      "Failed to fetch user details";
-    return rejectWithValue(message);
-  }
-});
-
-export const updateProfile = createAsyncThunk<
-  UserInfo,
-  FormData,
-  { state: RootState; rejectValue: string }
->("user/updateProfile", async (formData, { getState, rejectWithValue }) => {
-  try {
-    const { userInfo } = getState().user;
-    if (!userInfo || !userInfo.token) {
-      return rejectWithValue("Not authorized. Please login again.");
-    }
-
-    const config = getMultipartConfig(userInfo.token);
-    const { data } = await axios.put<UserInfo>(
-      `${API_URL}/profile`,
-      formData,
-      config
+    return rejectWithValue(
+      error.response?.data?.message || "Failed to send reset link."
     );
-
-    const updatedUserInfo: UserInfo = {
-      ...userInfo,
-      ...data,
-      token: userInfo.token,
-      isAdmin: userInfo.isAdmin,
-    };
-    saveUserInfoToStorage(updatedUserInfo);
-    return updatedUserInfo;
-  } catch (error: any) {
-    const message =
-      error.response?.data?.message ||
-      error.message ||
-      "Failed to update profile";
-    return rejectWithValue(message);
   }
 });
 
-export const deleteUser = createAsyncThunk<
-  string,
-  string,
-  { state: RootState; rejectValue: string }
->("user/delete", async (userId, { getState, rejectWithValue }) => {
+export const resetPassword = createAsyncThunk<
+  { success: boolean; message: string; token?: string },
+  { token: string; password: string },
+  { rejectValue: string }
+>("user/resetPassword", async ({ token, password }, { rejectWithValue }) => {
   try {
-    const token = getState().user.userInfo?.token;
-    if (!token) {
-      return rejectWithValue("Not authorized. Please login again.");
-    }
-    const config = getAuthConfig(token);
-    await axios.delete(`${API_URL}/${userId}`, config);
-    return userId;
+    const { data } = await axios.put(`${API_URL}/reset-password/${token}`, {
+      password,
+    });
+    return data;
   } catch (error: any) {
-    const message =
-      error.response?.data?.message || error.message || "Failed to delete user";
-    return rejectWithValue(message);
+    return rejectWithValue(
+      error.response?.data?.message || "Failed to reset password."
+    );
   }
 });
 
@@ -230,29 +165,10 @@ const userSlice = createSlice({
     logout: (state) => {
       removeUserInfoFromStorage();
       state.userInfo = null;
-      state.users = [];
-      state.selectedUser = null;
-      state.actionStatus = "idle";
-      state.singleStatus = "idle";
-      state.listStatus = "idle";
-      state.error = null;
-      state.singleError = null;
-      state.listError = null;
     },
     resetActionStatus: (state) => {
       state.actionStatus = "idle";
       state.error = null;
-    },
-    resetSingleStatus: (state) => {
-      state.singleStatus = "idle";
-      state.singleError = null;
-    },
-    resetListStatus: (state) => {
-      state.listStatus = "idle";
-      state.listError = null;
-    },
-    clearSelectedUser: (state) => {
-      state.selectedUser = null;
     },
   },
   extraReducers: (builder) => {
@@ -261,15 +177,22 @@ const userSlice = createSlice({
         state.actionStatus = "loading";
         state.error = null;
       })
-      .addCase(
-        registerUser.fulfilled,
-        (state, action: PayloadAction<UserInfo>) => {
-          state.actionStatus = "succeeded";
-          state.userInfo = action.payload;
-          state.error = null;
-        }
-      )
+      .addCase(registerUser.fulfilled, (state) => {
+        state.actionStatus = "succeeded";
+      })
       .addCase(registerUser.rejected, (state, action) => {
+        state.actionStatus = "failed";
+        state.error = action.payload as string;
+      })
+      .addCase(verifyOtp.pending, (state) => {
+        state.actionStatus = "loading";
+        state.error = null;
+      })
+      .addCase(verifyOtp.fulfilled, (state, action) => {
+        state.actionStatus = "succeeded";
+        state.userInfo = action.payload;
+      })
+      .addCase(verifyOtp.rejected, (state, action) => {
         state.actionStatus = "failed";
         state.error = action.payload as string;
       })
@@ -277,91 +200,39 @@ const userSlice = createSlice({
         state.actionStatus = "loading";
         state.error = null;
       })
-      .addCase(
-        loginUser.fulfilled,
-        (state, action: PayloadAction<UserInfo>) => {
-          state.actionStatus = "succeeded";
-          state.userInfo = action.payload;
-          state.error = null;
-        }
-      )
+      .addCase(loginUser.fulfilled, (state, action) => {
+        state.actionStatus = "succeeded";
+        state.userInfo = action.payload;
+      })
       .addCase(loginUser.rejected, (state, action) => {
         state.actionStatus = "failed";
         state.error = action.payload as string;
       })
-      .addCase(fetchAllUsers.pending, (state) => {
-        state.listStatus = "loading";
-        state.listError = null;
-      })
-      .addCase(
-        fetchAllUsers.fulfilled,
-        (state, action: PayloadAction<UserInfo[]>) => {
-          state.listStatus = "succeeded";
-          state.users = action.payload;
-          state.listError = null;
-        }
-      )
-      .addCase(fetchAllUsers.rejected, (state, action) => {
-        state.listStatus = "failed";
-        state.listError = action.payload as string;
-      })
-      .addCase(fetchUserById.pending, (state) => {
-        state.singleStatus = "loading";
-        state.singleError = null;
-      })
-      .addCase(
-        fetchUserById.fulfilled,
-        (state, action: PayloadAction<UserInfo>) => {
-          state.singleStatus = "succeeded";
-          state.selectedUser = action.payload;
-          state.singleError = null;
-        }
-      )
-      .addCase(fetchUserById.rejected, (state, action) => {
-        state.singleStatus = "failed";
-        state.singleError = action.payload as string;
-      })
-      .addCase(updateProfile.pending, (state) => {
+      .addCase(forgotPassword.pending, (state) => {
         state.actionStatus = "loading";
         state.error = null;
       })
-      .addCase(
-        updateProfile.fulfilled,
-        (state, action: PayloadAction<UserInfo>) => {
-          state.actionStatus = "succeeded";
-          state.userInfo = action.payload;
-          state.error = null;
-        }
-      )
-      .addCase(updateProfile.rejected, (state, action) => {
+      .addCase(forgotPassword.fulfilled, (state) => {
+        state.actionStatus = "succeeded";
+      })
+      .addCase(forgotPassword.rejected, (state, action) => {
         state.actionStatus = "failed";
         state.error = action.payload as string;
       })
-      .addCase(deleteUser.pending, (state) => {
+      .addCase(resetPassword.pending, (state) => {
         state.actionStatus = "loading";
         state.error = null;
       })
-      .addCase(deleteUser.fulfilled, (state, action: PayloadAction<string>) => {
+      .addCase(resetPassword.fulfilled, (state) => {
         state.actionStatus = "succeeded";
-        state.error = null;
-        state.users = state.users.filter((user) => user._id !== action.payload);
-        if (state.selectedUser?._id === action.payload) {
-          state.selectedUser = null;
-        }
       })
-      .addCase(deleteUser.rejected, (state, action) => {
+      .addCase(resetPassword.rejected, (state, action) => {
         state.actionStatus = "failed";
         state.error = action.payload as string;
       });
   },
 });
 
-export const {
-  logout,
-  resetActionStatus,
-  resetSingleStatus,
-  resetListStatus,
-  clearSelectedUser,
-} = userSlice.actions;
+export const { logout, resetActionStatus } = userSlice.actions;
 
 export default userSlice.reducer;

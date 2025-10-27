@@ -232,15 +232,16 @@ export function SiteHeader() {
               </Link>
             </Button>
 
-            {/* User Profile or Sign In/Register */}
-            {userInfo ? (
+            {/* ✅ FIX 1: Humne check ko 'userInfo' se 'userInfo && userInfo.name' kar diya hai */}
+            {userInfo && userInfo.name ? (
               <div ref={profileRef} className="relative">
                 <button
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
                   className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-gray-100 transition"
                 >
                   <div className="h-8 w-8 rounded-full bg-orange-500 flex items-center justify-center text-white font-semibold">
-                    {userInfo.name.charAt(0).toUpperCase()}
+                    {/* ✅ FIX 2: Optional chaining (`?.`) add kiya hai for extra safety */}
+                    {userInfo.name?.charAt(0).toUpperCase()}
                   </div>
                   <span className="hidden sm:inline text-sm font-medium">
                     {userInfo.name}

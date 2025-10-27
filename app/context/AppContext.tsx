@@ -57,7 +57,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [userInfo, dispatch]);
 
-  const cartItems: MappedCartItem[] = cartData
+  // ✅ FIX: Humne `(cartData || [])` add kiya hai.
+  // Isse agar `cartData` null ya undefined hai, to code crash hone ke bajaye ek khali array [] use karega.
+  const cartItems: MappedCartItem[] = (cartData || [])
     .filter((item) => item && item.jewelry)
     .map((item) => ({
       ...item.jewelry,
@@ -113,7 +115,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const isItemInWishlist = useCallback(
     (productId: string): boolean => {
-      return wishlistItems.includes(productId);
+      // ✅ FIX: Wishlist ke liye bhi safety check add kar diya hai
+      return (wishlistItems || []).includes(productId);
     },
     [wishlistItems]
   );
@@ -124,7 +127,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const value: AppContextType = {
     cartItems,
-    wishlistItems,
+    wishlistItems: wishlistItems || [], // ✅ Yahan bhi safety check
     addToCart,
     removeFromCart,
     updateQuantity,
