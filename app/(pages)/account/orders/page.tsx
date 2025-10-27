@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useDispatch, useSelector } from "react-redux";
+import axios from "axios"; // <-- 1. IMPORT AXIOS
+import { toast } from "react-toastify"; // <-- 2. (Optional) IMPORT TOAST for feedback
 import { AppDispatch, RootState } from "@/lib/store";
 import { fetchMyOrders, type Order } from "@/lib/features/orders/orderSlice";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -18,7 +20,13 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { Search, ShoppingBag, ArrowRight } from "lucide-react";
+import {
+  Search,
+  ShoppingBag,
+  ArrowRight,
+  Download,
+  Loader2,
+} from "lucide-react"; // <-- 3. IMPORT ICONS
 import {
   Dialog,
   DialogContent,
@@ -30,6 +38,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 
+// ... (getStatusVariant and formatPrice helpers are unchanged)
 const getStatusVariant = (
   status: string
 ): "success" | "default" | "secondary" | "destructive" | "outline" => {
@@ -65,9 +74,11 @@ export default function UserOrdersPage() {
     status,
     error,
   } = useSelector((state: RootState) => state.orders.myOrders);
+  const { userInfo } = useSelector((state: RootState) => state.user); // <-- 4. GET USERINFO FOR TOKEN
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [isDownloading, setIsDownloading] = useState<string | null>(null); // <-- 5. STATE TO TRACK DOWNLOADS
 
   useEffect(() => {
     dispatch(fetchMyOrders());
@@ -85,6 +96,46 @@ export default function UserOrdersPage() {
       return statusMatch && searchMatch;
     });
   }, [myOrders, searchTerm, statusFilter]);
+
+  // ==========================================================
+  // ========= 6. NEW INVOICE DOWNLOAD HANDLER ================
+  // ==========================================================
+  const handleDownloadInvoice = async (orderId: string) => {
+    if (!orderId || !userInfo?.token) {
+      toast.error(
+        "Could not download invoice. Order ID or user token missing."
+      );
+      return;
+    }
+
+    setIsDownloading(orderId); // Set the ID of the order being downloaded
+    try {
+      const config = {
+        headers: { Authorization: `Bearer ${userInfo.token}` },
+        responseType: "blob",
+      };
+
+      const { data } = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/orders/${orderId}/invoice`,
+        config
+      );
+
+      const url = window.URL.createObjectURL(new Blob([data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `invoice-${orderId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Invoice download failed:", error);
+      toast.error("Failed to download invoice. Please try again.");
+    } finally {
+      setIsDownloading(null); // Reset download state
+    }
+  };
 
   const OrderDetailModal = ({ order }: { order: Order }) => (
     <Dialog>
@@ -145,7 +196,23 @@ export default function UserOrdersPage() {
             </div>
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="sm:justify-between gap-2">
+          {/* ============================================== */}
+          {/* ========= 7. ADD DOWNLOAD BUTTON HERE ======== */}
+          {/* ============================================== */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => handleDownloadInvoice(order._id)}
+            disabled={isDownloading === order._id}
+          >
+            {isDownloading === order._id ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-4 w-4" />
+            )}
+            Download Invoice
+          </Button>
           <DialogClose asChild>
             <Button type="button" variant="secondary">
               Close
