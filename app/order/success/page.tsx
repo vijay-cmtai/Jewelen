@@ -405,7 +405,7 @@ function OrderSuccessContent() {
         </div>
         <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center animate-slide-up">
           <Button
-            onClick={() => router.push("/profile/orders")}
+            onClick={() => router.push("/account/orders")}
             className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-full font-semibold flex items-center justify-center gap-2"
           >
             View All Orders <ArrowRight className="h-4 w-4" />
