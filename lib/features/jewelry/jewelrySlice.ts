@@ -30,7 +30,8 @@ export interface JewelryItem {
   sku: string;
   description: string;
   price: number;
-  originalPrice?: number; // <-- YEH SABSE ZAROORI BADLAV HAI
+  originalPrice?: number;
+  tax?: number;
   images: string[];
   stockQuantity: number;
   category:
@@ -49,7 +50,7 @@ export interface JewelryItem {
     _id: string;
     name: string;
     email?: string;
-  };
+  } | null; // Seller null ho sakta hai
   createdAt: string;
   updatedAt: string;
 }
@@ -94,21 +95,20 @@ const getToken = (state: RootState) => state.user.userInfo?.token;
 
 function sanitizeObjectId(id: string): string {
   if (!id) return id;
-  let sanitized = id.trim();
-  if (sanitized.length > 24) {
-    sanitized = sanitized.substring(0, 24);
-  }
-  return sanitized;
+  return id.trim();
 }
 
 function sanitizeJewelryItem(item: any): JewelryItem {
   return {
     ...item,
     _id: sanitizeObjectId(item._id),
-    seller: {
-      ...item.seller,
-      _id: sanitizeObjectId(item.seller._id),
-    },
+    // Yahi sabse zaroori badlav hai: seller ko check karein
+    seller: item.seller
+      ? {
+          ...item.seller,
+          _id: sanitizeObjectId(item.seller._id),
+        }
+      : null,
   };
 }
 
@@ -155,8 +155,7 @@ export const fetchJewelryById = createAsyncThunk<
   { state: RootState }
 >("jewelry/fetchById", async (id, { rejectWithValue }) => {
   try {
-    const sanitizedId = sanitizeObjectId(id);
-    const { data } = await axios.get(`${API_URL}/${sanitizedId}`);
+    const { data } = await axios.get(`${API_URL}/${id}`);
     return sanitizeJewelryItem(data);
   } catch (error: any) {
     return rejectWithValue(
@@ -317,12 +316,7 @@ export const updateJewelry = createAsyncThunk<
     const token = getToken(getState());
     if (!token) throw new Error("No token found");
     const config = { headers: { Authorization: `Bearer ${token}` } };
-    const sanitizedId = sanitizeObjectId(id);
-    const { data } = await axios.put(
-      `${API_URL}/${sanitizedId}`,
-      updates,
-      config
-    );
+    const { data } = await axios.put(`${API_URL}/${id}`, updates, config);
     return sanitizeJewelryItem(data);
   } catch (error: any) {
     return rejectWithValue(
@@ -342,9 +336,8 @@ export const updateStock = createAsyncThunk<
       const token = getToken(getState());
       if (!token) throw new Error("No token found");
       const config = { headers: { Authorization: `Bearer ${token}` } };
-      const sanitizedId = sanitizeObjectId(id);
       const { data } = await axios.put(
-        `${API_URL}/${sanitizedId}/stock`,
+        `${API_URL}/${id}/stock`,
         { stockQuantity },
         config
       );
@@ -366,9 +359,8 @@ export const deleteJewelry = createAsyncThunk<
     const token = getToken(getState());
     if (!token) throw new Error("No token found");
     const config = { headers: { Authorization: `Bearer ${token}` } };
-    const sanitizedId = sanitizeObjectId(id);
-    await axios.delete(`${API_URL}/${sanitizedId}`, config);
-    return sanitizedId;
+    await axios.delete(`${API_URL}/${id}`, config);
+    return id;
   } catch (error: any) {
     return rejectWithValue(
       error.response?.data?.message || "Failed to delete jewelry"
@@ -582,4 +574,5 @@ const jewelrySlice = createSlice({
 
 export const { resetActionStatus, clearSelectedItem, clearCsvHeaders } =
   jewelrySlice.actions;
+
 export default jewelrySlice.reducer;
