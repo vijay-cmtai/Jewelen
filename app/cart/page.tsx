@@ -2,20 +2,25 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { ShoppingBag, ArrowRight, X, Plus, Minus } from "lucide-react"; // Naye icons import karein
+import { ShoppingBag, ArrowRight, X, Plus, Minus } from "lucide-react";
 import { useAppContext } from "@/app/context/AppContext";
 import { Button } from "@/components/ui/button";
 import { generateSlug } from "@/lib/utils";
 
 export default function CartPage() {
-  // updateQuantity function ko context se lein
   const { cartItems, removeFromCart, updateQuantity } = useAppContext();
 
+  // ✅ FIX: Humne .reduce() ko aur bhi safe bana diya hai.
+  // Ab yeh check karega ki item valid hai ya nahi, crash hone se pehle.
   const subtotal =
-    cartItems?.reduce(
-      (acc, item) => acc + (item?.price || 0) * (item?.quantity || 0),
-      0
-    ) || 0;
+    cartItems?.reduce((acc, item) => {
+      // Agar item null, undefined, ya usmein price/quantity nahi hai, to use skip kar do.
+      if (!item || typeof item.price !== 'number' || typeof item.quantity !== 'number') {
+        return acc; // Current total ko waise hi aage bhej do
+      }
+      return acc + item.price * item.quantity;
+    }, 0) || 0; // Agar cartItems null hai to 0 use karo
+
   const total = subtotal;
 
   if (!cartItems || cartItems.length === 0) {
@@ -52,6 +57,7 @@ export default function CartPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           <section className="lg:col-span-2 space-y-6">
             {cartItems.map((item) => {
+              // Extra safety check: Agar item null hai to kuch bhi render mat karo
               if (!item || !item._id) return null;
 
               const slug = generateSlug(item.name || "product", item._id);
@@ -85,7 +91,6 @@ export default function CartPage() {
                       </p>
                     </div>
 
-                    {/* --- YEH NAYA QUANTITY SELECTOR HAI --- */}
                     <div className="flex items-center border border-gray-200 rounded-full w-fit mt-4 sm:mt-0">
                       <Button
                         variant="ghost"
@@ -111,7 +116,6 @@ export default function CartPage() {
                         <Plus size={16} />
                       </Button>
                     </div>
-                    {/* ------------------------------------- */}
                   </div>
                   <Button
                     variant="ghost"
