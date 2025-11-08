@@ -1,7 +1,9 @@
-"use client";
+"use client"; // <-- THIS IS THE FIX
 
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import axios from "axios";
+import { toast } from "react-toastify";
 import { AppDispatch, RootState } from "@/lib/store";
 import {
   fetchAllOrders,
@@ -27,14 +29,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Loader2 } from "lucide-react";
+import { Loader2, Download } from "lucide-react";
 
 export default function AdminOrdersPage() {
   const dispatch = useDispatch<AppDispatch>();
   const { orders, listStatus, listError, selectedOrder, singleStatus } =
     useSelector((state: RootState) => state.orders);
+  const { userInfo } = useSelector((state: RootState) => state.user);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     dispatch(fetchAllOrders());
@@ -55,6 +59,43 @@ export default function AdminOrdersPage() {
       style: "currency",
       currency: "INR",
     }).format(price);
+  };
+
+  const handleDownloadInvoice = async (orderId: string) => {
+    if (!orderId || !userInfo?.token) {
+      toast.error(
+        "Could not download invoice. Order ID or admin token missing."
+      );
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      const config = {
+        headers: { Authorization: `Bearer ${userInfo.token}` },
+        responseType: "blob",
+      };
+
+      const { data } = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/orders/${orderId}/invoice`,
+        config
+      );
+
+      const url = window.URL.createObjectURL(new Blob([data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `invoice-${orderId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Invoice download failed:", error);
+      toast.error("Failed to download invoice. Please try again.");
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const getStatusVariant = (
@@ -83,7 +124,6 @@ export default function AdminOrdersPage() {
       </div>
     );
   }
-
   if (listStatus === "failed") {
     return (
       <div className="text-center text-red-500 mt-10">Error: {listError}</div>
@@ -225,7 +265,7 @@ export default function AdminOrdersPage() {
                         </p>
                       </div>
                       <div className="text-sm text-gray-500">
-                        {formatPrice(item.priceAtOrder)}
+                        {item.quantity} x {formatPrice(item.priceAtOrder)}
                       </div>
                     </div>
                   ))}
@@ -238,7 +278,19 @@ export default function AdminOrdersPage() {
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="sm:justify-between gap-2">
+            <Button
+              variant="default"
+              onClick={() => handleDownloadInvoice(selectedOrder!._id)}
+              disabled={isDownloading || !selectedOrder}
+            >
+              {isDownloading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              Download Invoice
+            </Button>
             <Button variant="outline" onClick={closeModal}>
               Close
             </Button>

@@ -36,14 +36,14 @@ import {
   X,
 } from "lucide-react";
 
-// --- MODIFIED ---
-// Initial state for manual form
+// Initial state for manual form with TAX
 const initialManualState = {
   name: "",
   sku: "",
   description: "",
   price: "",
-  originalPrice: "", // Added this field
+  originalPrice: "",
+  tax: "", // <-- ADDED TAX
   stockQuantity: "",
   category: "Rings",
   metalType: "Gold",
@@ -62,15 +62,11 @@ export default function AddInventoryPage() {
     (state: RootState) => state.jewelry
   );
 
-  // Manual form state
   const [manualForm, setManualForm] = useState(initialManualState);
   const [imageInput, setImageInput] = useState("");
-
-  // CSV upload state
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvMapping, setCsvMapping] = useState<Record<string, string>>({});
 
-  // Handle status changes
   useEffect(() => {
     if (actionStatus === "succeeded") {
       toast.success("Inventory operation successful!");
@@ -79,8 +75,6 @@ export default function AddInventoryPage() {
       setCsvFile(null);
       setCsvMapping({});
       dispatch(clearCsvHeaders());
-      // Optional: redirect
-      // router.push("/admin/inventory");
     }
     if (actionStatus === "failed" && error) {
       toast.error(error);
@@ -88,7 +82,6 @@ export default function AddInventoryPage() {
     }
   }, [actionStatus, error, dispatch, router]);
 
-  // Manual form handlers
   const handleManualChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -118,16 +111,14 @@ export default function AddInventoryPage() {
 
   const handleManualSubmit = (e: FormEvent) => {
     e.preventDefault();
-
     if (!manualForm.name || !manualForm.sku || !manualForm.price) {
       return toast.error("Name, SKU, and Price are required!");
     }
-
     if (manualForm.images.length === 0) {
       return toast.error("At least one image URL is required!");
     }
 
-    // --- MODIFIED ---
+    // Jewelry data with TAX
     const jewelryData = {
       name: manualForm.name,
       sku: manualForm.sku,
@@ -135,7 +126,8 @@ export default function AddInventoryPage() {
       price: parseFloat(manualForm.price),
       originalPrice: manualForm.originalPrice
         ? parseFloat(manualForm.originalPrice)
-        : undefined, // Add originalPrice if it exists
+        : undefined,
+      tax: manualForm.tax ? parseFloat(manualForm.tax) : 0, // <-- ADDED TAX
       stockQuantity: parseInt(manualForm.stockQuantity) || 1,
       category: manualForm.category as any,
       images: manualForm.images,
@@ -149,18 +141,14 @@ export default function AddInventoryPage() {
         ? manualForm.tags.split(",").map((t) => t.trim())
         : [],
     };
-
     dispatch(addJewelry(jewelryData));
   };
 
-  // --- MODIFIED CSV FLOW ---
-  // CSV handlers for direct upload
   const handleCsvFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setCsvFile(file);
-      setCsvMapping({}); // Reset mapping on new file
-      // Automatically preview headers to show mapping options
+      setCsvMapping({});
       dispatch(previewCsvHeaders(file));
     }
   };
@@ -171,27 +159,21 @@ export default function AddInventoryPage() {
 
   const handleCsvSubmit = (e: FormEvent) => {
     e.preventDefault();
-
     if (!csvFile) {
       return toast.error("Please select a CSV file!");
     }
-
     if (Object.keys(csvMapping).length === 0) {
       return toast.error("Please map at least one field!");
     }
-
-    // Check if at least SKU or Name is mapped
     const mappedValues = Object.values(csvMapping);
     if (!mappedValues.includes("sku") && !mappedValues.includes("name")) {
       return toast.error("You must map either 'SKU' or 'Name' field.");
     }
-
     dispatch(uploadCsv({ file: csvFile, mapping: csvMapping }));
   };
 
   const isLoading = actionStatus === "loading";
 
-  // Render helper functions
   const renderInputField = (
     name: keyof typeof initialManualState,
     label: string,
@@ -249,13 +231,14 @@ export default function AddInventoryPage() {
     </div>
   );
 
-  // --- MODIFIED ---
+  // Model fields with TAX
   const modelFields = [
     { value: "name", label: "Name" },
     { value: "sku", label: "SKU" },
     { value: "description", label: "Description" },
     { value: "price", label: "Price (Discounted)" },
-    { value: "originalPrice", label: "Original Price" }, // Added for mapping
+    { value: "originalPrice", label: "Original Price" },
+    { value: "tax", label: "Tax (%)" }, // <-- ADDED TAX
     { value: "stockQuantity", label: "Stock Quantity" },
     { value: "category", label: "Category" },
     { value: "metal.type", label: "Metal Type" },
@@ -295,12 +278,10 @@ export default function AddInventoryPage() {
               </TabsTrigger>
             </TabsList>
 
-            {/* Manual Entry Tab */}
             <TabsContent value="manual" className="mt-6">
               <form onSubmit={handleManualSubmit}>
                 <ScrollArea className="h-[60vh] pr-4">
                   <div className="space-y-8 p-1">
-                    {/* Essential Information */}
                     <div className="p-6 rounded-lg border bg-gray-50">
                       <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                         <Gem className="h-5 w-5 text-orange-500" /> Essential
@@ -316,7 +297,6 @@ export default function AddInventoryPage() {
                           true,
                           "e.g., 45000"
                         )}
-                        {/* --- NEW FIELD ADDED --- */}
                         {renderInputField(
                           "originalPrice",
                           "Original Price (Optional)",
@@ -324,6 +304,16 @@ export default function AddInventoryPage() {
                           false,
                           "e.g., 50000"
                         )}
+
+                        {/* --- ADDED TAX INPUT FIELD --- */}
+                        {renderInputField(
+                          "tax",
+                          "Tax (%) (Optional)",
+                          "number",
+                          false,
+                          "e.g., 3 for 3%"
+                        )}
+
                         {renderInputField(
                           "stockQuantity",
                           "Stock Quantity",
@@ -360,7 +350,6 @@ export default function AddInventoryPage() {
                       </div>
                     </div>
 
-                    {/* Metal Details */}
                     <div className="p-6 rounded-lg border bg-gray-50">
                       <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                         <Sparkles className="h-5 w-5 text-orange-500" /> Metal
@@ -389,7 +378,6 @@ export default function AddInventoryPage() {
                       </div>
                     </div>
 
-                    {/* Images */}
                     <div className="p-6 rounded-lg border bg-gray-50">
                       <h3 className="text-lg font-semibold text-gray-800 mb-4">
                         Product Images <span className="text-red-500">*</span>
@@ -435,7 +423,6 @@ export default function AddInventoryPage() {
                       )}
                     </div>
 
-                    {/* Tags */}
                     <div className="p-6 rounded-lg border bg-gray-50">
                       <Label htmlFor="tags">Tags (comma-separated)</Label>
                       <Input
@@ -450,7 +437,6 @@ export default function AddInventoryPage() {
                     </div>
                   </div>
                 </ScrollArea>
-
                 <div className="pt-6 border-t mt-6">
                   <Button
                     type="submit"
@@ -463,11 +449,9 @@ export default function AddInventoryPage() {
               </form>
             </TabsContent>
 
-            {/* CSV Upload Tab (Simplified Flow) */}
             <TabsContent value="csv" className="mt-6">
               <form onSubmit={handleCsvSubmit}>
                 <div className="space-y-6">
-                  {/* File Upload */}
                   <div className="p-6 rounded-lg border bg-gray-50">
                     <h3 className="text-lg font-semibold mb-4">
                       1. Upload CSV File
@@ -484,8 +468,6 @@ export default function AddInventoryPage() {
                       </p>
                     )}
                   </div>
-
-                  {/* Field Mapping */}
                   {csvHeaders.length > 0 && (
                     <div className="p-6 rounded-lg border bg-gray-50">
                       <h3 className="text-lg font-semibold mb-4">
@@ -531,8 +513,6 @@ export default function AddInventoryPage() {
                       </ScrollArea>
                     </div>
                   )}
-
-                  {/* Submit Button */}
                   {csvHeaders.length > 0 && (
                     <div>
                       <h3 className="text-lg font-semibold mb-4">
@@ -551,7 +531,6 @@ export default function AddInventoryPage() {
               </form>
             </TabsContent>
 
-            {/* Placeholder Tabs */}
             <TabsContent value="api_sync">
               <div className="text-center py-20 text-gray-500 border-2 border-dashed rounded-lg mt-6">
                 <h3 className="text-lg font-semibold">API Sync</h3>

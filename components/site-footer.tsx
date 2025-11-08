@@ -3,12 +3,10 @@ import Link from "next/link"
 const footerCols = {
   Shop: [
     ["Gift cards", "/gifts"],
-    ["Registry", "/registry"],
     ["Shipping", "/help/shipping"],
     ["Blog", "/blog"],
   ],
   Sell: [
-    ["Sell on Jewelia", "/sell"],
     ["Teams", "/sell/teams"],
     ["Affiliates & Creators", "/affiliates"],
   ],

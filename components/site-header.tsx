@@ -22,6 +22,8 @@ import {
   LogOut,
   LayoutDashboard,
   ChevronDown,
+  Menu,
+  X,
 } from "lucide-react";
 
 type QuickLink = {
@@ -47,9 +49,12 @@ export function SiteHeader() {
   const [q, setQ] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
   const debouncedQuery = useDebounce(q, 300);
   const searchRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   const { items: cartItems } = useSelector((state: RootState) => state.cart);
   const { itemIds: wishlistItems } = useSelector(
@@ -72,7 +77,7 @@ export function SiteHeader() {
     }
   }, [debouncedQuery, dispatch]);
 
-  // Close search dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -87,14 +92,33 @@ export function SiteHeader() {
       ) {
         setIsProfileOpen(false);
       }
+      if (
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsMobileMenuOpen(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Prevent body scroll when mobile menu is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isMobileMenuOpen]);
+
   const handleLogout = () => {
     dispatch(logout());
     setIsProfileOpen(false);
+    setIsMobileMenuOpen(false);
     router.push("/");
   };
 
@@ -109,35 +133,75 @@ export function SiteHeader() {
     }
   };
 
+  const handleSignIn = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsMobileMenuOpen(false);
+    router.push("/signin");
+  };
+
+  const handleSignUp = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsMobileMenuOpen(false);
+    router.push("/signup");
+  };
+
+  const handleSearch = () => {
+    if (q) {
+      router.push(`/search?q=${q}`);
+      setShowMobileSearch(false);
+      setIsFocused(false);
+    }
+  };
+
   return (
     <header className="sticky top-0 z-50 w-full bg-white border-b border-gray-200">
-      <div className="mx-auto max-w-[96rem] px-6">
-        <div className="flex items-center gap-4 py-3">
+      <div className="mx-auto max-w-[96rem] px-4 sm:px-6">
+        <div className="flex items-center gap-2 sm:gap-4 py-3">
+          {/* Mobile Menu Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          >
+            <Menu className="h-6 w-6" />
+          </Button>
+
+          {/* Logo */}
           <Link
             href="/"
-            className="text-3xl text-orange-500 hover:text-orange-600"
+            className="text-2xl sm:text-3xl text-orange-500 hover:text-orange-600 font-bold"
           >
             Jewelen
           </Link>
 
-          {/* Search Bar */}
-          <div ref={searchRef} className="relative ml-4 flex-1">
-            <form className="flex items-center rounded-full border border-gray-300 bg-white overflow-hidden focus-within:border-black focus-within:ring-2 focus-within:ring-orange-300">
+          {/* Desktop Search Bar */}
+          <div ref={searchRef} className="hidden md:block relative ml-4 flex-1">
+            <div className="flex items-center rounded-full border border-gray-300 bg-white overflow-hidden focus-within:border-black focus-within:ring-2 focus-within:ring-orange-300">
               <Input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 onFocus={() => setIsFocused(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSearch();
+                  }
+                }}
                 placeholder="Search for anything"
                 className="h-12 border-0 focus-visible:ring-0 px-4 flex-1"
               />
               <Button
-                type="submit"
+                type="button"
                 size="icon"
                 className="rounded-full h-10 w-10 bg-orange-500 m-1"
+                onClick={handleSearch}
               >
                 <Search className="h-5 w-5 text-white" />
               </Button>
-            </form>
+            </div>
 
             {/* Search Results Dropdown */}
             {isFocused && q && (
@@ -200,6 +264,16 @@ export function SiteHeader() {
 
           {/* Navigation Icons */}
           <nav className="ml-auto flex items-center gap-1 sm:gap-2">
+            {/* Mobile Search Icon */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden rounded-full"
+              onClick={() => setShowMobileSearch(!showMobileSearch)}
+            >
+              <Search className="h-6 w-6" />
+            </Button>
+
             <Button
               variant="ghost"
               size="icon"
@@ -207,9 +281,9 @@ export function SiteHeader() {
               asChild
             >
               <Link href="/favorites">
-                <Heart className="h-6 w-6" />
+                <Heart className="h-5 w-5 sm:h-6 sm:w-6" />
                 {wishlistItems.length > 0 && (
-                  <span className="absolute top-0 right-0 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+                  <span className="absolute top-0 right-0 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
                     {wishlistItems.length}
                   </span>
                 )}
@@ -223,27 +297,26 @@ export function SiteHeader() {
               asChild
             >
               <Link href="/cart">
-                <ShoppingCart className="h-6 w-6" />
+                <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6" />
                 {totalCartItems > 0 && (
-                  <span className="absolute top-0 right-0 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white">
+                  <span className="absolute top-0 right-0 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white">
                     {totalCartItems}
                   </span>
                 )}
               </Link>
             </Button>
 
-            {/* ✅ FIX 1: Humne check ko 'userInfo' se 'userInfo && userInfo.name' kar diya hai */}
+            {/* Desktop Profile/Auth */}
             {userInfo && userInfo.name ? (
-              <div ref={profileRef} className="relative">
+              <div ref={profileRef} className="relative hidden sm:block">
                 <button
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
                   className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-gray-100 transition"
                 >
                   <div className="h-8 w-8 rounded-full bg-orange-500 flex items-center justify-center text-white font-semibold">
-                    {/* ✅ FIX 2: Optional chaining (`?.`) add kiya hai for extra safety */}
                     {userInfo.name?.charAt(0).toUpperCase()}
                   </div>
-                  <span className="hidden sm:inline text-sm font-medium">
+                  <span className="hidden lg:inline text-sm font-medium">
                     {userInfo.name}
                   </span>
                   <ChevronDown
@@ -254,7 +327,6 @@ export function SiteHeader() {
                   />
                 </button>
 
-                {/* Profile Dropdown */}
                 {isProfileOpen && (
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-2xl border py-2 z-50">
                     <div className="px-4 py-3 border-b">
@@ -290,14 +362,14 @@ export function SiteHeader() {
               <>
                 <Button
                   variant="outline"
-                  className="hidden sm:inline-flex"
-                  onClick={() => router.push("/signin")}
+                  className="hidden lg:inline-flex"
+                  onClick={handleSignIn}
                 >
                   Sign In
                 </Button>
                 <Button
-                  className="hidden sm:inline-flex bg-orange-500 text-white"
-                  onClick={() => router.push("/signup")}
+                  className="hidden lg:inline-flex bg-orange-500 text-white hover:bg-orange-600"
+                  onClick={handleSignUp}
                 >
                   Register
                 </Button>
@@ -306,7 +378,36 @@ export function SiteHeader() {
           </nav>
         </div>
 
-        {/* Quick Links */}
+        {/* Mobile Search Bar */}
+        {showMobileSearch && (
+          <div className="md:hidden pb-3">
+            <div className="flex items-center rounded-full border border-gray-300 bg-white overflow-hidden focus-within:border-black focus-within:ring-2 focus-within:ring-orange-300">
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSearch();
+                  }
+                }}
+                placeholder="Search for anything"
+                className="h-10 border-0 focus-visible:ring-0 px-4 flex-1"
+                autoFocus
+              />
+              <Button
+                type="button"
+                size="icon"
+                className="rounded-full h-8 w-8 bg-orange-500 m-1"
+                onClick={handleSearch}
+              >
+                <Search className="h-4 w-4 text-white" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Desktop Quick Links */}
         <div className="hidden md:flex items-center justify-center gap-7 pb-3 pt-2">
           {quickLinks.map((l) => (
             <Link
@@ -321,6 +422,114 @@ export function SiteHeader() {
               <span>{l.label}</span>
             </Link>
           ))}
+        </div>
+      </div>
+
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden" />
+      )}
+
+      {/* Mobile Menu Sidebar */}
+      <div
+        ref={mobileMenuRef}
+        className={cn(
+          "fixed top-0 left-0 h-full w-80 bg-white z-50 transform transition-transform duration-300 ease-in-out md:hidden shadow-2xl overflow-y-auto",
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <div className="flex flex-col min-h-full">
+          {/* Mobile Menu Header */}
+          <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white z-10">
+            <span className="text-2xl text-orange-500 font-bold">Jewelen</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <X className="h-6 w-6" />
+            </Button>
+          </div>
+
+          {/* User Info or Auth Buttons */}
+          <div className="p-4 border-b">
+            {userInfo && userInfo.name ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-full bg-orange-500 flex items-center justify-center text-white font-semibold text-lg">
+                    {userInfo.name?.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 truncate">
+                      {userInfo.name}
+                    </p>
+                    <p className="text-sm text-gray-500 truncate">
+                      {userInfo.email}
+                    </p>
+                  </div>
+                </div>
+                <span className="inline-block px-3 py-1 text-xs rounded-full bg-orange-100 text-orange-700">
+                  {userInfo.role}
+                </span>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleSignIn}
+                >
+                  Sign In
+                </Button>
+                <Button
+                  className="w-full bg-orange-500 text-white hover:bg-orange-600"
+                  onClick={handleSignUp}
+                >
+                  Register
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Mobile Menu Links */}
+          <nav className="flex-1 py-4">
+            {quickLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "flex items-center gap-3 px-6 py-3 hover:bg-gray-50 transition",
+                  pathname === link.href &&
+                    "bg-orange-50 text-orange-600 border-l-4 border-orange-500"
+                )}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                {link.icon && <link.icon className="h-5 w-5" />}
+                <span className="font-medium">{link.label}</span>
+              </Link>
+            ))}
+
+            {userInfo && userInfo.name && (
+              <>
+                <div className="my-2 border-t" />
+                <Link
+                  href={getDashboardRoute()}
+                  className="flex items-center gap-3 px-6 py-3 hover:bg-gray-50 transition"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <LayoutDashboard className="h-5 w-5 text-gray-600" />
+                  <span className="font-medium">Dashboard</span>
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-3 px-6 py-3 hover:bg-red-50 transition text-red-600 mt-2 border-t pt-4"
+                >
+                  <LogOut className="h-5 w-5" />
+                  <span className="font-medium">Logout</span>
+                </button>
+              </>
+            )}
+          </nav>
         </div>
       </div>
     </header>
