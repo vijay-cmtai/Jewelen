@@ -5,6 +5,7 @@ const footerCols = {
     ["Gift cards", "/gifts"],
     ["Shipping", "/help/shipping"],
     ["Blog", "/blog"],
+    ["FAQ", "/faq"],
   ],
   Sell: [
     ["Teams", "/sell/teams"],
