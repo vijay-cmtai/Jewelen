@@ -1,3 +1,5 @@
+// File: @/lib/features/users/userSlice.ts
+
 import axios from "axios";
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "@/lib/store";
@@ -41,7 +43,6 @@ const getUserInfoFromStorage = (): UserInfo | null => {
 };
 
 const saveUserInfoToStorage = (userInfo: UserInfo): void => {
-  if (typeof window === "undefined") return;
   try {
     localStorage.setItem("userInfo", JSON.stringify(userInfo));
   } catch (error) {
@@ -50,7 +51,6 @@ const saveUserInfoToStorage = (userInfo: UserInfo): void => {
 };
 
 const removeUserInfoFromStorage = (): void => {
-  if (typeof window === "undefined") return;
   try {
     localStorage.removeItem("userInfo");
   } catch (error) {
@@ -71,8 +71,6 @@ const initialState: UserState = {
 };
 
 const API_URL = `${process.env.NEXT_PUBLIC_API_URL}/auth`;
-
-// --- Authentication Thunks ---
 
 export const registerUser = createAsyncThunk<
   { success: boolean; message: string },
@@ -162,34 +160,31 @@ export const resetPassword = createAsyncThunk<
   }
 });
 
-// --- Admin Thunk to Fetch All Users (ADDED) ---
-
 export const fetchAllUsers = createAsyncThunk<
   UserInfo[],
   void,
-  { rejectValue: string; state: RootState }
+  { state: RootState; rejectValue: string }
 >("user/fetchAll", async (_, { getState, rejectWithValue }) => {
   try {
-    const { userInfo } = getState().user;
-    if (!userInfo?.token) {
+    const token = getState().user.userInfo?.token;
+    if (!token) {
       return rejectWithValue("Not authorized, no token");
     }
 
     const config = {
       headers: {
-        Authorization: `Bearer ${userInfo.token}`,
+        Authorization: `Bearer ${token}`,
       },
     };
 
-    const { data } = await axios.get<UserInfo[]>(`${API_URL}/users`, config);
+    const { data } = await axios.get<UserInfo[]>(`${API_URL}/all`, config);
     return data;
   } catch (error: any) {
     return rejectWithValue(
-      error.response?.data?.message || "Failed to fetch users."
+      error.response?.data?.message || "Could not fetch users."
     );
   }
 });
-
 
 const userSlice = createSlice({
   name: "user",
@@ -206,7 +201,6 @@ const userSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Register
       .addCase(registerUser.pending, (state) => {
         state.actionStatus = "loading";
         state.error = null;
@@ -218,7 +212,6 @@ const userSlice = createSlice({
         state.actionStatus = "failed";
         state.error = action.payload as string;
       })
-      // Verify OTP
       .addCase(verifyOtp.pending, (state) => {
         state.actionStatus = "loading";
         state.error = null;
@@ -231,7 +224,6 @@ const userSlice = createSlice({
         state.actionStatus = "failed";
         state.error = action.payload as string;
       })
-      // Login
       .addCase(loginUser.pending, (state) => {
         state.actionStatus = "loading";
         state.error = null;
@@ -244,7 +236,6 @@ const userSlice = createSlice({
         state.actionStatus = "failed";
         state.error = action.payload as string;
       })
-      // Forgot Password
       .addCase(forgotPassword.pending, (state) => {
         state.actionStatus = "loading";
         state.error = null;
@@ -256,7 +247,6 @@ const userSlice = createSlice({
         state.actionStatus = "failed";
         state.error = action.payload as string;
       })
-      // Reset Password
       .addCase(resetPassword.pending, (state) => {
         state.actionStatus = "loading";
         state.error = null;
@@ -268,15 +258,17 @@ const userSlice = createSlice({
         state.actionStatus = "failed";
         state.error = action.payload as string;
       })
-      // Fetch All Users (ADDED)
       .addCase(fetchAllUsers.pending, (state) => {
         state.listStatus = "loading";
         state.listError = null;
       })
-      .addCase(fetchAllUsers.fulfilled, (state, action) => {
-        state.listStatus = "succeeded";
-        state.users = action.payload;
-      })
+      .addCase(
+        fetchAllUsers.fulfilled,
+        (state, action: PayloadAction<UserInfo[]>) => {
+          state.listStatus = "succeeded";
+          state.users = action.payload;
+        }
+      )
       .addCase(fetchAllUsers.rejected, (state, action) => {
         state.listStatus = "failed";
         state.listError = action.payload as string;
@@ -285,5 +277,4 @@ const userSlice = createSlice({
 });
 
 export const { logout, resetActionStatus } = userSlice.actions;
-
 export default userSlice.reducer;
