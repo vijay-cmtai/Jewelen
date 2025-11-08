@@ -29,7 +29,7 @@ const cats = [
   ],
   [
     "Brooches",
-    "https://images.unsplash.com/photo-1629216816424-67e28e46ba5b?w=400&q=80",
+    "https://www.shutterstock.com/image-vector/illustration-set-gold-jewelry-eagle-600nw-2437107123.jpg",
     "/brooches",
   ],
 ];
