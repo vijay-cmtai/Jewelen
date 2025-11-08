@@ -1,4 +1,4 @@
-// app/checkout/page.tsx
+// File: app/checkout/page.tsx
 
 "use client";
 
@@ -8,10 +8,11 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
-import { Lock, Loader2, Home, Briefcase, PlusCircle } from "lucide-react";
+import { Lock, Loader2, Home, Briefcase, PlusCircle, Tag } from "lucide-react";
 import { AppDispatch, RootState } from "@/lib/store";
 import { useAppContext } from "@/app/context/AppContext";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { fetchAddresses } from "@/lib/features/address/addressSlice";
 import { createOrder, verifyPayment } from "@/lib/features/orders/orderSlice";
 
@@ -21,7 +22,6 @@ declare global {
   }
 }
 
-// <-- YEH CODE CHECKOUT PAGE KA HAI
 export default function CheckoutPage() {
   const { cartItems, clearCart } = useAppContext();
   const router = useRouter();
@@ -36,6 +36,14 @@ export default function CheckoutPage() {
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
     null
   );
+
+  // States for coupon management
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    discount: number;
+  } | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
 
   useEffect(() => {
     const script = document.createElement("script");
@@ -59,23 +67,58 @@ export default function CheckoutPage() {
     }
   }, [addresses]);
 
-  const mrpTotal = cartItems.reduce(
-    (acc, item) =>
-      acc + (item?.originalPrice || item?.price || 0) * (item?.quantity || 0),
-    0
-  );
-  const discountedSubtotal = cartItems.reduce(
+  const subtotal = cartItems.reduce(
     (acc, item) => acc + (item?.price || 0) * (item?.quantity || 0),
     0
   );
-  const totalDiscount = mrpTotal - discountedSubtotal;
   const totalTax = cartItems.reduce(
     (acc, item) =>
       acc +
       ((item?.price || 0) * (item?.quantity || 0) * (item?.tax || 0)) / 100,
     0
   );
-  const grandTotal = discountedSubtotal + totalTax;
+
+  const discountAmount = appliedCoupon ? appliedCoupon.discount : 0;
+  // Note: The grandTotal sent to backend should be pre-discount. The final amount for payment is handled by backend.
+  const preDiscountGrandTotal = subtotal + totalTax;
+  const finalGrandTotal = preDiscountGrandTotal - discountAmount;
+
+  // Function to apply coupon
+  const handleApplyCoupon = async () => {
+    if (!couponCode) {
+      toast.error("Please enter a coupon code.");
+      return;
+    }
+    setCouponLoading(true);
+    try {
+      // NOTE: You need to create this backend route to validate the coupon
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/coupons/validate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${userInfo?.token}`,
+          },
+          body: JSON.stringify({ code: couponCode, totalAmount: subtotal }), // Send subtotal for min purchase validation
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to apply coupon");
+      }
+
+      setAppliedCoupon({ code: data.code, discount: data.discountAmount });
+      toast.success(`Coupon "${data.code}" applied successfully!`);
+    } catch (error: any) {
+      setAppliedCoupon(null);
+      toast.error(error.message);
+    } finally {
+      setCouponLoading(false);
+    }
+  };
 
   const handlePlaceOrder = async () => {
     if (!selectedAddressId) {
@@ -87,7 +130,8 @@ export default function CheckoutPage() {
         createOrder({
           addressId: selectedAddressId,
           items: cartItems,
-          totalAmount: grandTotal,
+          totalAmount: preDiscountGrandTotal,
+          couponCode: appliedCoupon?.code,
         })
       ).unwrap();
 
@@ -262,22 +306,63 @@ export default function CheckoutPage() {
                   ))}
                 </ul>
               </div>
+              <div className="mt-6 border-t border-gray-200 pt-6">
+                <label
+                  htmlFor="coupon"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Have a discount code?
+                </label>
+                <div className="mt-1 flex rounded-md shadow-sm">
+                  <Input
+                    type="text"
+                    id="coupon"
+                    name="coupon"
+                    value={couponCode}
+                    onChange={(e) =>
+                      setCouponCode(e.target.value.toUpperCase())
+                    }
+                    className="flex-1 rounded-none rounded-l-md"
+                    placeholder="Enter coupon"
+                    disabled={!!appliedCoupon}
+                  />
+                  <Button
+                    onClick={handleApplyCoupon}
+                    disabled={couponLoading || !!appliedCoupon}
+                    className="rounded-r-md rounded-l-none bg-gray-700 hover:bg-gray-800 px-4"
+                  >
+                    {couponLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Apply"
+                    )}
+                  </Button>
+                </div>
+                {appliedCoupon && (
+                  <p className="mt-2 text-sm text-green-600 flex items-center gap-1">
+                    <Tag className="h-4 w-4" /> Coupon "{appliedCoupon.code}"
+                    applied!
+                  </p>
+                )}
+              </div>
               <div className="mt-6 border-t border-gray-200 pt-6 space-y-3 text-base">
                 <div className="flex items-center justify-between text-gray-600">
-                  <p>MRP Total</p>
-                  <p>₹{mrpTotal.toLocaleString()}</p>
+                  <p>Subtotal</p>
+                  <p>₹{subtotal.toLocaleString()}</p>
                 </div>
-                <div className="flex items-center justify-between text-green-600">
-                  <p>Discount on MRP</p>
-                  <p>- ₹{totalDiscount.toLocaleString()}</p>
-                </div>
+                {appliedCoupon && (
+                  <div className="flex items-center justify-between text-green-600 font-medium">
+                    <p>Discount ({appliedCoupon.code})</p>
+                    <p>- ₹{discountAmount.toLocaleString()}</p>
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-gray-600">
                   <p>Taxes & Charges</p>
                   <p>₹{totalTax.toLocaleString()}</p>
                 </div>
                 <div className="flex items-center justify-between border-t border-gray-200 pt-4 mt-4 text-lg font-bold text-gray-900">
                   <p>Grand Total</p>
-                  <p>₹{grandTotal.toLocaleString()}</p>
+                  <p>₹{finalGrandTotal.toLocaleString()}</p>
                 </div>
               </div>
             </div>

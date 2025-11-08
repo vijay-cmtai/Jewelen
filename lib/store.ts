@@ -10,6 +10,7 @@ import wishlistReducer from "./features/wishlist/wishlistSlice";
 import userDashboardReducer from "./features/dashboard/userDashboardSlice";
 import blogReducer from "./features/blog/blogSlice";
 import cartReducer from "./features/cart/cartSlice";
+import couponsReducer from "./features/coupons/couponSlice";
 
 export const makeStore = () => {
   return configureStore({
@@ -23,6 +24,7 @@ export const makeStore = () => {
       wishlist: wishlistReducer,
       userDashboard: userDashboardReducer,
       blogs: blogReducer,
+      coupons: couponsReducer,
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({

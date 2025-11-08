@@ -1,4 +1,4 @@
-import Link from "next/link"
+import Link from "next/link";
 
 const footerCols = {
   Shop: [
@@ -22,7 +22,7 @@ const footerCols = {
     ["Help Centre", "/help"],
     ["Privacy settings", "/privacy"],
   ],
-}
+};
 
 export function SiteFooter() {
   return (
@@ -34,7 +34,9 @@ export function SiteFooter() {
             <div className="md:col-span-1">
               <div className="rounded-xl bg-primary text-primary-foreground p-6 w-max">
                 <div className="text-xl font-semibold">Jewelia App</div>
-                <div className="text-sm opacity-90 mt-1">Download the Jewelia app</div>
+                <div className="text-sm opacity-90 mt-1">
+                  Download the Jewelia app
+                </div>
               </div>
             </div>
             {Object.entries(footerCols).map(([title, links]) => (
@@ -43,7 +45,10 @@ export function SiteFooter() {
                 <ul className="space-y-2">
                   {links.map(([label, href]) => (
                     <li key={label}>
-                      <Link href={href} className="text-sm text-muted-foreground hover:text-foreground">
+                      <Link
+                        href={href}
+                        className="text-sm text-muted-foreground hover:text-foreground"
+                      >
                         {label}
                       </Link>
                     </li>
@@ -76,5 +81,5 @@ export function SiteFooter() {
         </div>
       </div>
     </footer>
-  )
+  );
 }

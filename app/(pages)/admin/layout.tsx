@@ -28,6 +28,7 @@ const adminNavLinks = [
   { href: "/admin/add-blog", label: "Add Blogs", icon: Package },
   { href: "/admin/orders", label: "Orders", icon: ListOrdered },
   { href: "/admin/seller", label: "Seller", icon: ListOrdered },
+  { href: "/admin/coupons", label: "Coupons", icon: Package },
 ];
 
 export default function AdminClientLayout({
