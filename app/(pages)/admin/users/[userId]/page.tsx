@@ -1,10 +1,17 @@
+// File: app/admin/users/[userId]/page.tsx
+
 "use client";
 
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useParams, useRouter } from "next/navigation";
 import { AppDispatch, RootState } from "@/lib/store";
-import { fetchUserById } from "@/lib/features/users/userSlice";
+import {
+  fetchUserById,
+  updateUserStatus,
+  resetActionStatus,
+} from "@/lib/features/users/userSlice";
+import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,7 +21,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, CheckCircle, XCircle } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const formatDate = (dateString?: string) => {
@@ -53,15 +60,37 @@ export default function UserDetailPage() {
   const router = useRouter();
   const userId = params.userId as string;
 
-  const { selectedUser, singleStatus, singleError } = useSelector(
-    (state: RootState) => state.user
-  );
+  const { selectedUser, singleStatus, singleError, actionStatus, actionError } =
+    useSelector((state: RootState) => state.user);
 
   useEffect(() => {
     if (userId) {
       dispatch(fetchUserById(userId));
     }
   }, [dispatch, userId]);
+
+  useEffect(() => {
+    if (actionStatus === "succeeded") {
+      toast.success("User status updated successfully!");
+      dispatch(resetActionStatus());
+    }
+    if (actionStatus === "failed") {
+      toast.error(actionError || "Failed to update status.");
+      dispatch(resetActionStatus());
+    }
+  }, [actionStatus, actionError, dispatch]);
+
+  const handleApprove = () => {
+    if (window.confirm("Are you sure you want to approve this user?")) {
+      dispatch(updateUserStatus({ userId, status: "Approved" }));
+    }
+  };
+
+  const handleReject = () => {
+    if (window.confirm("Are you sure you want to reject this user?")) {
+      dispatch(updateUserStatus({ userId, status: "Rejected" }));
+    }
+  };
 
   if (singleStatus === "loading") {
     return (
@@ -78,6 +107,34 @@ export default function UserDetailPage() {
   }
 
   if (!selectedUser) return null;
+
+  const getStatusVariant = (
+    status?: string
+  ): "default" | "secondary" | "destructive" | "outline" => {
+    switch (status) {
+      case "Approved":
+        return "default";
+      case "Pending":
+        return "secondary";
+      case "Rejected":
+        return "destructive";
+      default:
+        return "outline";
+    }
+  };
+
+  const getRoleVariant = (
+    role?: string
+  ): "default" | "secondary" | "outline" => {
+    switch (role) {
+      case "Admin":
+        return "default";
+      case "Supplier":
+        return "outline";
+      default:
+        return "secondary";
+    }
+  };
 
   return (
     <div className="max-w-5xl mx-auto p-4 md:p-6">
@@ -101,23 +158,55 @@ export default function UserDetailPage() {
               <CardTitle className="text-2xl">{selectedUser.name}</CardTitle>
               <CardDescription>{selectedUser.email}</CardDescription>
               <div className="pt-2">
-                <Badge
-                  variant={
-                    selectedUser.role === "Admin" ? "default" : "secondary"
-                  }
-                >
+                <Badge variant={getRoleVariant(selectedUser.role)}>
                   {selectedUser.role}
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="text-center text-sm">
-              <p>
-                Status:{" "}
-                <span className="font-semibold">{selectedUser.status}</span>
-              </p>
-              <p className="text-muted-foreground">
+            <CardContent className="text-center space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Status</p>
+                <Badge variant={getStatusVariant(selectedUser.status)}>
+                  {selectedUser.status}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
                 Joined on {formatDate(selectedUser.createdAt)}
               </p>
+
+              {selectedUser.status === "Pending" && (
+                <div className="pt-4 border-t space-y-2">
+                  <h4 className="text-sm font-semibold">Actions</h4>
+                  <div className="flex justify-center gap-2">
+                    <Button
+                      onClick={handleApprove}
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700"
+                      disabled={actionStatus === "loading"}
+                    >
+                      {actionStatus === "loading" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                      )}
+                      Approve
+                    </Button>
+                    <Button
+                      onClick={handleReject}
+                      size="sm"
+                      variant="destructive"
+                      disabled={actionStatus === "loading"}
+                    >
+                      {actionStatus === "loading" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <XCircle className="h-4 w-4 mr-2" />
+                      )}
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -125,6 +214,9 @@ export default function UserDetailPage() {
           <Card>
             <CardHeader>
               <CardTitle>Additional User Information</CardTitle>
+              <CardDescription>
+                Details provided during registration.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">

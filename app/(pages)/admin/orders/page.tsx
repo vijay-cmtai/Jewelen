@@ -1,4 +1,4 @@
-"use client"; // <-- THIS IS THE FIX
+"use client";
 
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -259,9 +259,7 @@ export default function AdminOrdersPage() {
                     >
                       <div className="flex-1">
                         <p className="font-medium">
-                          {item.jewelry?.name ||
-                            item.name ||
-                            `Item ID: ${item._id}`}
+                          {item.jewelry?.name || `Item ID: ${item._id}`}
                         </p>
                       </div>
                       <div className="text-sm text-gray-500">

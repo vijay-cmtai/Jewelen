@@ -1,7 +1,9 @@
+// File: app/signin/page.tsx
+
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,22 +19,29 @@ export default function SignInPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   const router = useRouter();
+  const searchParams = useSearchParams();
   const dispatch = useDispatch<AppDispatch>();
 
   const { userInfo, actionStatus, error } = useSelector(
     (state: RootState) => state.user
   );
 
-  useEffect(() => {
-    if (userInfo && userInfo.token) {
-      router.push("/");
-    }
-  }, [userInfo, router]);
-
+  // ✅ REDIRECT LOGIC UPDATE KIYA GAYA HAI
   useEffect(() => {
     if (actionStatus === "succeeded" && userInfo) {
       toast.success("Login Successful!");
-      router.push("/");
+
+      // Check user role for redirection
+      if (userInfo.role === "Admin") {
+        router.push("/admin/dashboard");
+      } else if (userInfo.role === "Supplier") {
+        router.push("/supplier/dashboard");
+      } else {
+        // For 'User' or any other role, redirect to home or a specific user dashboard
+        const redirect = searchParams.get("redirect");
+        router.push(redirect || "/");
+      }
+
       dispatch(resetActionStatus());
     }
 
@@ -40,7 +49,7 @@ export default function SignInPage() {
       toast.error(error);
       dispatch(resetActionStatus());
     }
-  }, [actionStatus, userInfo, error, router, dispatch]);
+  }, [actionStatus, userInfo, error, router, dispatch, searchParams]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

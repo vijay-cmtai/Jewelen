@@ -1,3 +1,5 @@
+// File: app/admin/users/page.tsx
+
 "use client";
 
 import { useEffect } from "react";
@@ -61,6 +63,19 @@ export default function AdminUsersPage() {
     }
   };
 
+  const getRoleVariant = (
+    role?: string
+  ): "default" | "secondary" | "outline" => {
+    switch (role) {
+      case "Admin":
+        return "default";
+      case "Supplier":
+        return "outline";
+      default:
+        return "secondary";
+    }
+  };
+
   if (listStatus === "loading") {
     return (
       <div className="flex justify-center items-center h-[calc(100vh-200px)]">
@@ -120,9 +135,7 @@ export default function AdminUsersPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant={user.role === "Admin" ? "default" : "secondary"}
-                    >
+                    <Badge variant={getRoleVariant(user.role)}>
                       {user.role}
                     </Badge>
                   </TableCell>
@@ -138,7 +151,7 @@ export default function AdminUsersPage() {
                       size="sm"
                       onClick={() => router.push(`/admin/users/${user._id}`)}
                     >
-                      <Eye className="w-4 h-4 mr-2" /> View
+                      <Eye className="w-4 h-4 mr-2" /> View Details
                     </Button>
                   </TableCell>
                 </TableRow>

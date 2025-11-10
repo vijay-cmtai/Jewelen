@@ -11,6 +11,7 @@ import userDashboardReducer from "./features/dashboard/userDashboardSlice";
 import blogReducer from "./features/blog/blogSlice";
 import cartReducer from "./features/cart/cartSlice";
 import couponsReducer from "./features/coupons/couponSlice";
+import supplierReducer from "./features/supplier/supplierSlice";
 
 export const makeStore = () => {
   return configureStore({
@@ -25,6 +26,7 @@ export const makeStore = () => {
       userDashboard: userDashboardReducer,
       blogs: blogReducer,
       coupons: couponsReducer,
+      supplier: supplierReducer,
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({

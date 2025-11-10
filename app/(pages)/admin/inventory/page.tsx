@@ -8,9 +8,12 @@ import { toast } from "react-toastify";
 import {
   fetchJewelry,
   deleteJewelry,
+  approveJewelry,
+  rejectJewelry,
   JewelryItem,
 } from "@/lib/features/jewelry/jewelrySlice";
 
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -27,6 +30,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -47,6 +51,8 @@ import {
   Trash2,
   MoreHorizontal,
   Loader2,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 
 const placeholderImage = "/placeholder-jewelry.jpg";
@@ -55,33 +61,33 @@ export default function AdminInventoryPage() {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
 
-  // ✅✅ Sudhaar Yahan Hai ✅✅
-  // Hum 'error' ko destructure kar rahe hain aur use 'listError' naam de rahe hain
   const {
     items,
     listStatus,
     error: listError,
   } = useSelector((state: RootState) => state.jewelry);
-
   const [searchTerm, setSearchTerm] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<JewelryItem | null>(null);
+  const [activeTab, setActiveTab] = useState("all");
 
   useEffect(() => {
-    dispatch(fetchJewelry({}));
-  }, [dispatch]);
+    dispatch(fetchJewelry({ status: activeTab }));
+  }, [dispatch, activeTab]);
 
-  const filteredItems = items.filter((item) => {
-    return searchTerm
-      ? item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.name.toLowerCase().includes(searchTerm.toLowerCase())
-      : true;
-  });
+  const handleApprove = (item: JewelryItem) => {
+    dispatch(approveJewelry(item._id))
+      .unwrap()
+      .then(() => toast.success(`Item ${item.sku} has been approved.`))
+      .catch((error) => toast.error(`Failed to approve: ${error}`));
+  };
 
-  const handleView = (item: JewelryItem) =>
-    router.push(`/products/${item._id}`);
-  const handleEdit = (item: JewelryItem) =>
-    router.push(`/admin/inventory/edit/${item._id}`);
+  const handleReject = (item: JewelryItem) => {
+    dispatch(rejectJewelry(item._id))
+      .unwrap()
+      .then(() => toast.success(`Item ${item.sku} has been rejected.`))
+      .catch((error) => toast.error(`Failed to reject: ${error}`));
+  };
 
   const handleDelete = (item: JewelryItem) => {
     setSelectedItem(item);
@@ -103,25 +109,33 @@ export default function AdminInventoryPage() {
     }
   };
 
-  const formatPrice = (price: number) =>
-    new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-    }).format(price);
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "Approved":
+        return (
+          <Badge variant="default" className="bg-green-500 text-white">
+            Approved
+          </Badge>
+        );
+      case "Pending":
+        return (
+          <Badge variant="secondary" className="bg-yellow-500 text-white">
+            Pending
+          </Badge>
+        );
+      case "Rejected":
+        return <Badge variant="destructive">Rejected</Badge>;
+      default:
+        return <Badge>{status}</Badge>;
+    }
+  };
 
-  if (listStatus === "loading") {
-    return (
-      <div className="flex justify-center items-center h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
-  if (listStatus === "failed") {
-    return (
-      <div className="text-center text-red-500 mt-10">Error: {listError}</div>
-    );
-  }
+  const filteredItems = items.filter((item) => {
+    return searchTerm
+      ? item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.name.toLowerCase().includes(searchTerm.toLowerCase())
+      : true;
+  });
 
   return (
     <div className="p-4 md:p-6">
@@ -129,7 +143,7 @@ export default function AdminInventoryPage() {
         <div>
           <h1 className="text-3xl font-bold">Inventory Management</h1>
           <p className="text-gray-500">
-            Total {filteredItems.length} items in inventory
+            Total {filteredItems.length} items found
           </p>
         </div>
         <Button
@@ -157,30 +171,48 @@ export default function AdminInventoryPage() {
         </CardHeader>
 
         <CardContent>
-          {filteredItems.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <h3 className="text-lg font-semibold">No Jewelry Found</h3>
-              <p className="text-sm mt-1">
-                Try adjusting your search or add new items.
-              </p>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
+            <TabsList>
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="Pending">Pending</TabsTrigger>
+              <TabsTrigger value="Approved">Approved</TabsTrigger>
+              <TabsTrigger value="Rejected">Rejected</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {listStatus === "loading" && (
+            <div className="flex justify-center py-10">
+              <Loader2 className="h-8 w-8 animate-spin" />
             </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Image</TableHead>
-                  <TableHead>Details</TableHead>
-                  <TableHead>Primary Gemstone</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Seller</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredItems.map((item) => {
-                  const primaryGem = item.gemstones?.[0];
-                  return (
+          )}
+          {listStatus === "failed" && (
+            <div className="text-center text-red-500 py-10">
+              Error: {listError}
+            </div>
+          )}
+
+          {listStatus === "succeeded" &&
+            (filteredItems.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <h3 className="text-lg font-semibold">No Jewelry Found</h3>
+                <p className="text-sm mt-1">
+                  Try adjusting your filters or add new items.
+                </p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Image</TableHead>
+                    <TableHead>Details</TableHead>
+                    <TableHead>Price</TableHead>
+                    <TableHead>Seller</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredItems.map((item) => (
                     <TableRow key={item._id}>
                       <TableCell>
                         <img
@@ -198,24 +230,11 @@ export default function AdminInventoryPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {primaryGem ? (
-                          <>
-                            <div className="font-medium">
-                              {primaryGem.shape || primaryGem.type}{" "}
-                              {primaryGem.carat?.toFixed(2)}ct
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {primaryGem.color} {primaryGem.clarity}{" "}
-                              {primaryGem.cut}
-                            </div>
-                          </>
-                        ) : (
-                          "N/A"
-                        )}
-                      </TableCell>
-                      <TableCell>
                         <div className="font-bold">
-                          {formatPrice(item.price)}
+                          {new Intl.NumberFormat("en-IN", {
+                            style: "currency",
+                            currency: "INR",
+                          }).format(item.price)}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -223,15 +242,7 @@ export default function AdminInventoryPage() {
                           {item.seller?.name || "—"}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            item.stockQuantity > 0 ? "default" : "secondary"
-                          }
-                        >
-                          {item.stockQuantity > 0 ? "In Stock" : "Out of Stock"}
-                        </Badge>
-                      </TableCell>
+                      <TableCell>{getStatusBadge(item.status)}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -240,10 +251,36 @@ export default function AdminInventoryPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleView(item)}>
+                            {item.status === "Pending" && (
+                              <>
+                                <DropdownMenuItem
+                                  onClick={() => handleApprove(item)}
+                                  className="text-green-600"
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-2" />{" "}
+                                  Approve
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleReject(item)}
+                                  className="text-orange-600"
+                                >
+                                  <XCircle className="h-4 w-4 mr-2" /> Reject
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                              </>
+                            )}
+                            <DropdownMenuItem
+                              onClick={() =>
+                                router.push(`/admin/inventory/${item._id}`)
+                              }
+                            >
                               <Eye className="h-4 w-4 mr-2" /> View
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEdit(item)}>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                router.push(`/admin/inventory/edit/${item._id}`)
+                              }
+                            >
                               <Edit className="h-4 w-4 mr-2" /> Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem
@@ -256,11 +293,10 @@ export default function AdminInventoryPage() {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
+                  ))}
+                </TableBody>
+              </Table>
+            ))}
         </CardContent>
       </Card>
 

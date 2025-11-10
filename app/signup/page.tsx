@@ -1,3 +1,5 @@
+// File: app/signup/page.tsx
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -5,7 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Users, ShieldAlert } from "lucide-react";
+import { Users, ShieldAlert, Store } from "lucide-react";
 import { toast } from "react-toastify";
 import { useSelector, useDispatch } from "react-redux";
 import {
@@ -14,7 +16,7 @@ import {
 } from "@/lib/features/users/userSlice";
 import type { AppDispatch, RootState } from "@/lib/store";
 
-type UserRole = "User" | "Admin";
+type UserRole = "User" | "Admin" | "Supplier";
 
 export default function SignUpPage() {
   const [selectedRole, setSelectedRole] = useState<UserRole>("User");
@@ -44,24 +46,33 @@ export default function SignUpPage() {
       dispatch(resetActionStatus());
     }
     if (actionStatus === "succeeded") {
-      toast.success("Registration successful! Please verify your OTP.");
-      // Redirect to OTP page with email in query
+      if (selectedRole === "Supplier") {
+        toast.success("Supplier account request sent! Please verify OTP.");
+      } else {
+        toast.success("Registration successful! Please verify your OTP.");
+      }
       router.push(`/verify-otp?email=${encodeURIComponent(formData.email)}`);
       dispatch(resetActionStatus());
     }
-  }, [actionStatus, error, dispatch, router, formData.email]);
+  }, [actionStatus, error, dispatch, router, formData.email, selectedRole]);
 
   const userTypes = [
     {
       role: "User" as UserRole,
-      label: "User",
-      description: "Create a standard user account.",
+      label: "I'm a Customer",
+      description: "Browse and purchase beautiful jewelry.",
       icon: Users,
     },
     {
+      role: "Supplier" as UserRole,
+      label: "I'm a Supplier",
+      description: "Sell your creations on our marketplace.",
+      icon: Store,
+    },
+    {
       role: "Admin" as UserRole,
-      label: "Admin",
-      description: "Create an administrator account.",
+      label: "I'm an Administrator",
+      description: "Manage the platform and users.",
       icon: ShieldAlert,
     },
   ];
@@ -84,6 +95,9 @@ export default function SignUpPage() {
     if (formData.password !== formData.confirmPassword) {
       return toast.error("Passwords do not match!");
     }
+    if (formData.password.length < 6) {
+      return toast.error("Password must be at least 6 characters long.");
+    }
 
     const registrationData = new FormData();
     registrationData.append("name", formData.name);
@@ -102,7 +116,7 @@ export default function SignUpPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-12">
-      <div className="mx-auto max-w-2xl">
+      <div className="mx-auto max-w-4xl">
         <div className="mb-10 text-center">
           <h1 className="text-4xl font-bold tracking-tight text-gray-800">
             Create an Account
@@ -112,7 +126,7 @@ export default function SignUpPage() {
           </p>
         </div>
 
-        <div className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {userTypes.map(({ role, label, description, icon: Icon }) => (
             <button
               key={role}
@@ -178,6 +192,9 @@ export default function SignUpPage() {
                 value={formData.confirmPassword}
                 onChange={handleInputChange}
               />
+
+              {/* ✅ ADMIN KEY WALA INPUT FIELD HATA DIYA GAYA HAI */}
+
               <div>
                 <label
                   htmlFor="file-upload"
@@ -204,7 +221,7 @@ export default function SignUpPage() {
               className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold"
               disabled={isLoading}
             >
-              {isLoading ? "Registering..." : "Create Account"}
+              {isLoading ? "Creating Account..." : "Create Account"}
             </Button>
 
             <p className="text-center text-sm text-gray-600">

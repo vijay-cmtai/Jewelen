@@ -90,13 +90,14 @@ export default function EditJewelryPage() {
     if (actionStatus === "succeeded") {
       toast.success("Jewelry item updated successfully!");
       dispatch(resetActionStatus());
-      router.push(`/products/${itemId}`);
+      // --- IS LINE KO BADLEIN ---
+      router.push(`/admin/inventory`); // Public page ki jagah admin inventory page par wapas jayein
     }
     if (actionStatus === "failed" && error) {
       toast.error(error);
       dispatch(resetActionStatus());
     }
-  }, [actionStatus, error, dispatch, router, itemId]);
+  }, [actionStatus, error, dispatch, router]); // itemId ko dependency se hata sakte hain
 
   const handleInputChange = (
     field: keyof JewelryItem | `metal.${keyof JewelryItem["metal"]}`,
@@ -117,7 +118,7 @@ export default function EditJewelryPage() {
     field: keyof JewelryItem | `metal.${keyof JewelryItem["metal"]}`,
     value: string
   ) => {
-    const numericValue = value === "" ? 0 : parseFloat(value);
+    const numericValue = value === "" ? undefined : parseFloat(value);
     handleInputChange(field, numericValue);
   };
 
@@ -143,15 +144,15 @@ export default function EditJewelryPage() {
     if (
       !formData.name ||
       !formData.sku ||
-      !formData.price ||
-      !formData.stockQuantity
+      formData.price === undefined ||
+      formData.stockQuantity === undefined
     ) {
       toast.error("Name, SKU, Price, and Stock are required.");
       return;
     }
     const finalData = {
       ...formData,
-      images: imagePreviews.filter((url) => url.trim() !== ""),
+      images: imagePreviews.filter((url) => url && url.trim() !== ""),
     };
     dispatch(updateJewelry({ id: itemId, updates: finalData }));
   };
@@ -165,10 +166,16 @@ export default function EditJewelryPage() {
     );
   }
 
-  if (singleStatus === "failed" || !selectedItem) {
+  if (
+    singleStatus === "failed" ||
+    (singleStatus === "succeeded" && !selectedItem)
+  ) {
     return (
       <div className="container mx-auto py-12 px-4 text-center">
         <h2 className="text-2xl font-semibold mb-2">Jewelry Not Found</h2>
+        <p className="text-muted-foreground mb-4">
+          The item you are looking for does not exist.
+        </p>
         <Button onClick={() => router.push("/admin/inventory")}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Inventory
         </Button>
@@ -197,7 +204,6 @@ export default function EditJewelryPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-24">
-          {/* Left Column */}
           <div className="lg:col-span-1 space-y-8">
             <Card>
               <CardHeader>
@@ -273,7 +279,6 @@ export default function EditJewelryPage() {
             </Card>
           </div>
 
-          {/* Right Column */}
           <div className="lg:col-span-2 space-y-8">
             <Card>
               <CardHeader>
@@ -347,7 +352,7 @@ export default function EditJewelryPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Tag className="h-5 w-5" /> Metal & Gemstones
+                  <Tag className="h-5 w-5" /> Metal
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -406,7 +411,6 @@ export default function EditJewelryPage() {
                     />
                   </div>
                 </div>
-                {/* Note: For simplicity, editing gemstones is not included. You can add this feature later. */}
               </CardContent>
             </Card>
           </div>

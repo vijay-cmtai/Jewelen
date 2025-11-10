@@ -1,6 +1,11 @@
 "use client";
+
+import { useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useDispatch, useSelector } from "react-redux";
+import { AppDispatch, RootState } from "@/lib/store";
+import { fetchSupplierDashboard } from "@/lib/features/supplier/supplierSlice"; // <-- Naya thunk import karein
 import {
   Card,
   CardContent,
@@ -24,7 +29,7 @@ import {
   Package,
   ShoppingCart,
   ArrowUpRight,
-  Users,
+  Loader2,
 } from "lucide-react";
 import {
   Bar,
@@ -34,63 +39,8 @@ import {
   YAxis,
   Tooltip,
 } from "recharts";
-const dummyDashboardData = {
-  stats: {
-    totalRevenue: { value: "₹4,25,999", change: "+15.2%" },
-    newOrders: { value: "182", change: "+35" },
-    productsInStock: { value: "540", change: "+12" },
-    newCustomers: { value: "45", change: "+8" },
-  },
-  salesOverview: [
-    { month: "Jan", revenue: 40000 },
-    { month: "Feb", revenue: 30000 },
-    { month: "Mar", revenue: 50000 },
-    { month: "Apr", revenue: 45000 },
-    { month: "May", revenue: 60000 },
-    { month: "Jun", revenue: 75000 },
-  ],
-  bestSellers: [
-    {
-      name: "Classic Gold Bangle",
-      sales: 120,
-      image:
-        "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=48&h=48&fit=crop",
-    },
-    {
-      name: "Silver Charm Bracelet",
-      sales: 95,
-      image:
-        "https://images.unsplash.com/photo-1631931413024-38ed4a4c372b?w=48&h=48&fit=crop",
-    },
-    {
-      name: "Diamond Tennis Bracelet",
-      sales: 60,
-      image:
-        "https://images.unsplash.com/photo-1620921282050-a54056c38090?w=48&h=48&fit=crop",
-    },
-  ],
-  recentOrders: [
-    {
-      id: "#ORD-001",
-      customer: "Elena Gilbert",
-      status: "completed",
-      amount: 45999,
-    },
-    {
-      id: "#ORD-002",
-      customer: "Caroline Forbes",
-      status: "pending",
-      amount: 3498,
-    },
-    {
-      id: "#ORD-003",
-      customer: "Bonnie Bennett",
-      status: "completed",
-      amount: 999,
-    },
-  ],
-};
-// --- END OF DUMMY DATA ---
+
+// StatCard Component (UI Helper - No Change)
 const StatCard = ({
   title,
   value,
@@ -101,7 +51,7 @@ const StatCard = ({
   title: string;
   value: string;
   icon: React.ElementType;
-  change: string;
+  change?: string;
   colorClass: string;
 }) => (
   <Card
@@ -116,54 +66,96 @@ const StatCard = ({
     </CardHeader>
     <CardContent className="relative z-10">
       <div className="text-3xl font-bold">{value}</div>
-      <div className="flex items-center gap-1 text-xs mt-1 text-green-300">
-        <ArrowUpRight className="h-3 w-3" />
-        <span>{change}</span>
-      </div>
+      {change && (
+        <div className="flex items-center gap-1 text-xs mt-1 text-green-300">
+          <ArrowUpRight className="h-3 w-3" />
+          <span>{change}</span>
+        </div>
+      )}
     </CardContent>
   </Card>
 );
+
+// Main Dashboard Component
 export default function SupplierDashboardPage() {
-  const { stats, salesOverview, bestSellers, recentOrders } =
-    dummyDashboardData;
+  const dispatch = useDispatch<AppDispatch>();
+
+  // Redux store se data select karein
+  const { dashboard, status, error } = useSelector(
+    (state: RootState) => state.supplier
+  );
+  const { userInfo } = useSelector((state: RootState) => state.user);
+
+  useEffect(() => {
+    // Component mount hone par data fetch karne ke liye thunk dispatch karein
+    dispatch(fetchSupplierDashboard());
+  }, [dispatch]);
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+    }).format(value);
+
+  // Loading state handle karein
+  if (status === "loading") {
+    return (
+      <div className="flex h-[70vh] items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Error state handle karein
+  if (status === "failed" || !dashboard) {
+    return (
+      <div className="text-center py-20">
+        <h2 className="text-xl font-semibold">Could Not Load Dashboard</h2>
+        <p className="text-muted-foreground">
+          {error || "Please try again later."}
+        </p>
+      </div>
+    );
+  }
+
+  const {
+    totalRevenue,
+    newOrdersCount,
+    productsInStock,
+    salesOverview,
+    bestSellers,
+    recentOrders,
+  } = dashboard;
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Welcome, Damon!</h1>
+        <h1 className="text-3xl font-bold tracking-tight">
+          Welcome, {userInfo?.name}!
+        </h1>
         <p className="text-gray-500">
           Here's a snapshot of your store's performance.
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <StatCard
           title="Total Revenue"
-          value={stats.totalRevenue.value}
+          value={formatCurrency(totalRevenue)}
           icon={DollarSign}
-          change={stats.totalRevenue.change}
           colorClass="bg-gradient-to-r from-blue-500 to-blue-600"
         />
         <StatCard
-          title="New Orders"
-          value={stats.newOrders.value}
+          title="New Orders (This Month)"
+          value={newOrdersCount.toString()}
           icon={ShoppingCart}
-          change={stats.newOrders.change}
           colorClass="bg-gradient-to-r from-violet-500 to-purple-600"
         />
         <StatCard
           title="Products in Stock"
-          value={stats.productsInStock.value}
+          value={productsInStock.toString()}
           icon={Package}
-          change={stats.productsInStock.change}
           colorClass="bg-gradient-to-r from-emerald-500 to-green-600"
-        />
-        <StatCard
-          title="New Customers"
-          value={stats.newCustomers.value}
-          icon={Users}
-          change={stats.newCustomers.change}
-          colorClass="bg-gradient-to-r from-amber-500 to-orange-600"
         />
       </div>
 
@@ -172,7 +164,7 @@ export default function SupplierDashboardPage() {
           <CardHeader>
             <CardTitle>Sales Overview</CardTitle>
             <CardDescription>
-              Your revenue performance over the last 6 months.
+              Your revenue performance over the last months.
             </CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
@@ -198,6 +190,7 @@ export default function SupplierDashboardPage() {
                     borderRadius: "0.5rem",
                     borderColor: "#e2e8f0",
                   }}
+                  formatter={(value) => formatCurrency(value as number)}
                 />
                 <Bar dataKey="revenue" fill="#f97316" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -208,34 +201,42 @@ export default function SupplierDashboardPage() {
         <Card className="shadow-sm border">
           <CardHeader>
             <CardTitle>Best Sellers</CardTitle>
-            <CardDescription>
-              Your top-performing products this month.
-            </CardDescription>
+            <CardDescription>Your top-performing products.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {bestSellers.map((product) => (
-              <div key={product.name} className="flex items-center gap-4">
-                <Image
-                  src={product.image}
-                  alt={product.name}
-                  width={48}
-                  height={48}
-                  className="rounded-md border bg-gray-50 object-cover"
-                />
-                <div className="flex-1">
-                  <p className="font-medium text-sm">{product.name}</p>
-                  <p className="text-xs text-gray-500">{product.sales} sales</p>
+            {bestSellers.length > 0 ? (
+              bestSellers.map((product: any) => (
+                <div key={product.name} className="flex items-center gap-4">
+                  <Image
+                    src={product.image || "/placeholder-jewelry.jpg"}
+                    alt={product.name}
+                    width={48}
+                    height={48}
+                    className="rounded-md border bg-gray-50 object-cover"
+                  />
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{product.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {product.sales} sales
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground text-center pt-8">
+                No sales data available to determine best sellers.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
 
       <Card className="shadow-sm border">
         <CardHeader>
-          <CardTitle>Recent Orders</CardTitle>
-          <CardDescription>A list of your most recent orders.</CardDescription>
+          <CardTitle>Recent Sales</CardTitle>
+          <CardDescription>
+            A list of your most recent sales from orders.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -244,33 +245,43 @@ export default function SupplierDashboardPage() {
                 <TableHead>Order ID</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-right">Your Cut</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {recentOrders.map((order) => (
-                <TableRow key={order.id}>
-                  <TableCell className="font-medium">{order.id}</TableCell>
-                  <TableCell>{order.customer}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="capitalize">
-                      {order.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {new Intl.NumberFormat("en-IN", {
-                      style: "currency",
-                      currency: "INR",
-                    }).format(order.amount)}
+              {recentOrders.length > 0 ? (
+                recentOrders.map((order: any) => (
+                  <TableRow key={order._id}>
+                    <TableCell className="font-medium">
+                      #{order._id.slice(-6).toUpperCase()}
+                    </TableCell>
+                    <TableCell>{order.customer}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize">
+                        {order.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(order.amount)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={4}
+                    className="text-center h-24 text-muted-foreground"
+                  >
+                    No recent orders found.
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </CardContent>
         <CardFooter className="flex justify-end">
           <Button asChild variant="outline">
-            <Link href="/supplier/orders">View All Orders</Link>
+            <Link href="/supplier/orders">View All Sales</Link>
           </Button>
         </CardFooter>
       </Card>

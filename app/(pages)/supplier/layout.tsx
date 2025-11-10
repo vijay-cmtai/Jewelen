@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -27,8 +26,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useSelector, useDispatch } from "react-redux";
+import type { RootState } from "@/lib/store";
+import { logout } from "@/lib/features/users/userSlice";
 
-// Helper to get initials
 const getInitials = (name: string = "") =>
   name
     .split(" ")
@@ -36,9 +37,9 @@ const getInitials = (name: string = "") =>
     .join("")
     .toUpperCase() || "S";
 
-// Navigation links for supplier
 const supplierNavLinks = [
   { href: "/supplier", label: "Dashboard", icon: LayoutDashboard },
+  {href: "/supplier/addInventory", label: "AddProducts", icon: Package },
   { href: "/supplier/inventory", label: "Inventory", icon: Package },
   { href: "/supplier/orders", label: "Orders", icon: ListOrdered },
   { href: "/supplier/profile", label: "My Profile", icon: Building },
@@ -52,25 +53,18 @@ export default function SupplierLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const dispatch = useDispatch();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // DUMMY USER DATA
-  const dummyUser = {
-    name: "Damon Salvatore",
-    email: "damon@supplier.com",
-    image: "https://i.pravatar.cc/150?u=damon", // Placeholder image
-  };
+  const { userInfo } = useSelector((state: RootState) => state.user);
 
-  // Dummy logout function
   const handleLogout = () => {
-    alert("Logging out...");
-    router.push("/signin"); // Redirect to sign-in page
+    dispatch(logout());
+    router.push("/signin");
   };
 
-  // Reusable Sidebar Content
   const SidebarContent = ({ onLinkClick }: { onLinkClick?: () => void }) => (
     <div className="flex flex-col h-full">
-      {/* Header */}
       <div className="flex items-center gap-3 p-4 border-b">
         <div className="p-2 rounded-lg bg-orange-500/10">
           <ShieldCheck className="h-6 w-6 text-orange-500" />
@@ -78,7 +72,6 @@ export default function SupplierLayout({
         <h2 className="text-lg font-bold">Supplier Portal</h2>
       </div>
 
-      {/* Navigation with ScrollArea */}
       <ScrollArea className="flex-1 mt-4">
         <nav className="flex flex-col space-y-1 px-4">
           {supplierNavLinks.map((link) => {
@@ -106,7 +99,6 @@ export default function SupplierLayout({
         </nav>
       </ScrollArea>
 
-      {/* Logout Button */}
       <div className="mt-auto p-4 border-t">
         <Button
           variant="ghost"
@@ -121,16 +113,12 @@ export default function SupplierLayout({
 
   return (
     <div className="min-h-screen w-full bg-gray-50 md:grid md:grid-cols-[260px_1fr]">
-      {/* DESKTOP SIDEBAR - FIXED */}
       <aside className="hidden md:block border-r bg-white h-screen sticky top-0">
         <SidebarContent />
       </aside>
 
-      {/* MOBILE HEADER & MAIN CONTENT AREA */}
       <div className="flex flex-col">
-        {/* HEADER - STICKY */}
         <header className="flex h-16 items-center justify-between gap-4 border-b bg-white px-6 sticky top-0 z-30 md:justify-end">
-          {/* Mobile Menu Button */}
           <div className="md:hidden">
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
@@ -146,7 +134,6 @@ export default function SupplierLayout({
             </Sheet>
           </div>
 
-          {/* User Profile Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -154,8 +141,11 @@ export default function SupplierLayout({
                 className="relative h-10 w-10 rounded-full"
               >
                 <Avatar className="h-10 w-10 border">
-                  <AvatarImage src={dummyUser.image} alt={dummyUser.name} />
-                  <AvatarFallback>{getInitials(dummyUser.name)}</AvatarFallback>
+                  <AvatarImage
+                    src={userInfo?.profilePicture?.url}
+                    alt={userInfo?.name}
+                  />
+                  <AvatarFallback>{getInitials(userInfo?.name)}</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
@@ -163,10 +153,10 @@ export default function SupplierLayout({
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium leading-none">
-                    {dummyUser.name}
+                    {userInfo?.name || "Guest User"}
                   </p>
                   <p className="text-xs leading-none text-gray-500">
-                    {dummyUser.email}
+                    {userInfo?.email || ""}
                   </p>
                 </div>
               </DropdownMenuLabel>
@@ -186,7 +176,6 @@ export default function SupplierLayout({
           </DropdownMenu>
         </header>
 
-        {/* MAIN CONTENT - SCROLLABLE */}
         <main className="flex-1 p-4 md:p-8">{children}</main>
       </div>
     </div>

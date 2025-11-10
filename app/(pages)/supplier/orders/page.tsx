@@ -1,6 +1,9 @@
 "use client";
 
-import Link from "next/link";
+import { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { toast } from "react-toastify";
+import { AppDispatch, RootState } from "@/lib/store";
 import {
   Table,
   TableBody,
@@ -20,64 +23,57 @@ import {
 import {
   MoreHorizontal,
   FileText,
-  CheckCircle,
   XCircle,
   Package,
+  Loader2,
+  Truck,
 } from "lucide-react";
+import {
+  updateOrderItemStatus,
+  fetchSellerOrders,
+} from "@/lib/features/orders/orderSlice";
 
-// --- DUMMY DATA ---
-// Yeh data ab backend se nahi, yahin se aa raha hai
-const dummySellerOrders = [
-  {
-    _id: "ORD-001-XYZ",
-    uniqueKey: "ORD-001-XYZ-item1",
-    userId: { name: "Elena Gilbert", email: "elena@example.com" },
-    item: {
-      _id: "item1",
-      stockId: "JWL-001",
-      shape: "Round",
-      imageLink:
-        "https://images.unsplash.com/photo-1610481615363-f220d343c5b5?w=40&h=40&fit=crop",
-    },
-    orderStatus: "Shipped",
-    totalAmount: 12000 * 80, // Price in INR
-    createdAt: "2023-11-01T10:00:00.000Z",
-  },
-  {
-    _id: "ORD-002-PQR",
-    uniqueKey: "ORD-002-PQR-item2",
-    userId: { name: "Caroline Forbes", email: "caroline@example.com" },
-    item: {
-      _id: "item2",
-      stockId: "JWL-002",
-      shape: "Princess",
-      imageLink:
-        "https://images.unsplash.com/photo-1599208008819-2d88a1013a7a?w=40&h=40&fit=crop",
-    },
-    orderStatus: "Processing",
-    totalAmount: 6500 * 80,
-    createdAt: "2023-11-03T14:20:00.000Z",
-  },
-  {
-    _id: "ORD-003-LMN",
-    uniqueKey: "ORD-003-LMN-item3",
-    userId: { name: "Bonnie Bennett", email: "bonnie@example.com" },
-    item: {
-      _id: "item3",
-      stockId: "JWL-003",
-      shape: "Cushion",
-      imageLink:
-        "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=40&h=40&fit=crop",
-    },
-    orderStatus: "Completed",
-    totalAmount: 25000 * 80,
-    createdAt: "2023-10-25T09:00:00.000Z",
-  },
-];
-// --- END OF DUMMY DATA ---
+export default function SupplierOrdersPage() {
+  const dispatch = useDispatch<AppDispatch>();
 
-export default function OrdersPage() {
-  // Helper to format price in INR
+  const {
+    data: sellerOrders,
+    status,
+    error,
+  } = useSelector((state: RootState) => state.orders.sellerOrders);
+  const { userInfo } = useSelector((state: RootState) => state.user);
+
+  useEffect(() => {
+    dispatch(fetchSellerOrders());
+  }, [dispatch]);
+
+  const sellerItemsInOrders = sellerOrders
+    .flatMap((order) =>
+      (order.items as any[])
+        .filter((item) => item.jewelry?.seller === userInfo?._id)
+        .map((item) => ({
+          ...item,
+          orderId: order._id,
+          buyer: order.userId,
+          orderDate: order.createdAt,
+        }))
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()
+    );
+
+  const handleUpdateStatus = (
+    orderId: string,
+    itemId: string,
+    status: string
+  ) => {
+    dispatch(updateOrderItemStatus({ orderId, itemId, status }))
+      .unwrap()
+      .then(() => toast.success(`Item marked as ${status}.`))
+      .catch((err) => toast.error(err as string));
+  };
+
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -86,29 +82,40 @@ export default function OrdersPage() {
   };
 
   const getStatusVariant = (
-    orderStatus: string
+    status: string
   ): "default" | "secondary" | "destructive" | "outline" => {
-    switch (orderStatus) {
+    switch (status) {
       case "Processing":
         return "secondary";
       case "Shipped":
         return "default";
-      case "Completed":
+      case "Delivered":
         return "outline";
       case "Cancelled":
-      case "Failed":
         return "destructive";
       default:
         return "secondary";
     }
   };
 
+  if (status === "loading") {
+    return (
+      <div className="flex justify-center items-center h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (status === "failed") {
+    return <div className="text-center text-red-500 mt-10">Error: {error}</div>;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Your Sales</h1>
         <p className="text-sm text-gray-500">
-          {dummySellerOrders.length} sales found
+          {sellerItemsInOrders.length} sales found
         </p>
       </div>
 
@@ -116,20 +123,19 @@ export default function OrdersPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Order ID</TableHead>
               <TableHead>Product Sold</TableHead>
               <TableHead>Buyer</TableHead>
               <TableHead>Date</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>Item Status</TableHead>
               <TableHead className="text-right">Amount</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {dummySellerOrders.length === 0 ? (
+            {sellerItemsInOrders.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={6}
                   className="h-48 text-center text-gray-500"
                 >
                   <Package className="mx-auto h-12 w-12 text-gray-300 mb-4" />
@@ -141,81 +147,88 @@ export default function OrdersPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              dummySellerOrders.map((order) => {
-                const product = order.item;
-                return (
-                  <TableRow key={order.uniqueKey}>
-                    <TableCell className="font-mono text-sm">
-                      #{order._id.substring(4, 7)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={product.imageLink || "/placeholder-diamond.jpg"}
-                          alt={product.shape || "Diamond"}
-                          width={40}
-                          height={40}
-                          className="rounded-md border object-cover aspect-square"
-                        />
-                        <div>
-                          <div className="font-medium">
-                            {product.shape || "Diamond"}
-                          </div>
-                          <div className="text-gray-500 text-xs">
-                            {product.stockId}
-                          </div>
+              sellerItemsInOrders.map((item) => (
+                <TableRow key={item._id}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={
+                          item.jewelry?.images?.[0] ||
+                          "/placeholder-jewelry.jpg"
+                        }
+                        alt={item.jewelry?.name || "Jewelry"}
+                        width={40}
+                        height={40}
+                        className="rounded-md border object-cover aspect-square"
+                      />
+                      <div>
+                        <div className="font-medium">{item.jewelry?.name}</div>
+                        <div className="text-gray-500 text-xs">
+                          {item.jewelry?.sku}
                         </div>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">{order.userId.name}</div>
-                      <div className="text-xs text-gray-500">
-                        {order.userId.email}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(order.createdAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusVariant(order.orderStatus)}>
-                        {order.orderStatus}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      {formatPrice(order.totalAmount)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="font-medium">{item.buyer.name}</div>
+                    <div className="text-xs text-gray-500">
+                      {item.buyer.email}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {new Date(item.orderDate).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={getStatusVariant(item.status)}>
+                      {item.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right font-medium">
+                    {formatPrice(item.priceAtOrder * item.quantity)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {item.status === "Processing" && (
                           <DropdownMenuItem
                             onClick={() =>
-                              alert(`Marking order ${order._id} as Shipped`)
+                              handleUpdateStatus(
+                                item.orderId,
+                                item._id,
+                                "Shipped"
+                              )
                             }
                           >
-                            <CheckCircle className="mr-2 h-4 w-4" /> Mark as
-                            Shipped
+                            <Truck className="mr-2 h-4 w-4" /> Mark as Shipped
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600 focus:text-red-600">
+                        )}
+                        {item.status !== "Cancelled" && (
+                          <DropdownMenuItem
+                            className="text-red-600 focus:text-red-600"
+                            onClick={() =>
+                              handleUpdateStatus(
+                                item.orderId,
+                                item._id,
+                                "Cancelled"
+                              )
+                            }
+                          >
                             <XCircle className="mr-2 h-4 w-4" /> Cancel Sale
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              alert(`Viewing details for ${order._id}`)
-                            }
-                          >
-                            <FileText className="mr-2 h-4 w-4" /> View Details
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
+                        )}
+                        <DropdownMenuItem disabled>
+                          <FileText className="mr-2 h-4 w-4" /> View Details
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>

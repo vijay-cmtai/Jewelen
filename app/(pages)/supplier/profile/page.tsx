@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,8 +13,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Camera, Edit, Loader2, Save, X, Building } from "lucide-react";
+import { useSelector, useDispatch } from "react-redux";
+import type { RootState, AppDispatch } from "@/lib/store";
+import {
+  updateUserProfile,
+  resetActionStatus,
+} from "@/lib/features/users/userSlice";
 
-// Helper to get initials
 const getInitials = (name: string = "") =>
   name
     .split(" ")
@@ -22,28 +27,51 @@ const getInitials = (name: string = "") =>
     .join("")
     .toUpperCase() || "S";
 
-// --- DUMMY DATA ---
-const dummySupplierInfo = {
-  companyName: "Mystic Gems",
-  name: "Damon Salvatore",
-  email: "damon@supplier.com",
-  avatarUrl: "https://i.pravatar.cc/150?u=damon",
-  companyWebsite: "www.mysticgems.com",
-  companyAddress: "123 Mystic Falls, VA, USA",
-};
-// --- END OF DUMMY DATA ---
-
 export default function SupplierProfilePage() {
+  const dispatch: AppDispatch = useDispatch();
+  const { userInfo, actionStatus, actionError } = useSelector(
+    (state: RootState) => state.user
+  );
+
   const [isEditing, setIsEditing] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    companyName: "",
+    name: "",
+    companyWebsite: "",
+    companyAddress: "",
+  });
 
-  // User info state (changes will be saved here)
-  const [userInfo, setUserInfo] = useState(dummySupplierInfo);
-  // Form data state (for editing)
-  const [formData, setFormData] = useState(dummySupplierInfo);
-
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (userInfo) {
+      setFormData({
+        companyName: userInfo.companyName || "",
+        name: userInfo.name || "",
+        companyWebsite: userInfo.companyWebsite || "",
+        companyAddress: userInfo.companyAddress || "",
+      });
+    }
+    return () => {
+      dispatch(resetActionStatus());
+    };
+  }, [userInfo, dispatch]);
+
+  useEffect(() => {
+    if (actionStatus === "succeeded") {
+      alert("Profile updated successfully!");
+      setIsEditing(false);
+      setAvatarPreview(null);
+      setAvatarFile(null);
+      dispatch(resetActionStatus());
+    }
+    if (actionStatus === "failed") {
+      alert(`Error: ${actionError}`);
+      dispatch(resetActionStatus());
+    }
+  }, [actionStatus, actionError, dispatch]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -52,39 +80,48 @@ export default function SupplierProfilePage() {
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      setAvatarFile(file);
       setAvatarPreview(URL.createObjectURL(file));
-      // In a real app, you would also set a state for the file object to be uploaded
     }
   };
 
   const handleCancel = () => {
     setIsEditing(false);
-    setFormData(userInfo); // Revert changes to the original state
+    if (userInfo) {
+      setFormData({
+        companyName: userInfo.companyName || "",
+        name: userInfo.name || "",
+        companyWebsite: userInfo.companyWebsite || "",
+        companyAddress: userInfo.companyAddress || "",
+      });
+    }
     setAvatarPreview(null);
+    setAvatarFile(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    const dataToSubmit = new FormData();
+    dataToSubmit.append("name", formData.name);
+    dataToSubmit.append("companyName", formData.companyName);
+    dataToSubmit.append("companyWebsite", formData.companyWebsite);
+    dataToSubmit.append("companyAddress", formData.companyAddress);
 
-    console.log("Saving data:", formData);
-    if (avatarPreview) console.log("New avatar selected.");
-
-    // Simulate an API call
-    setTimeout(() => {
-      setUserInfo(formData); // "Save" the data by updating the main user info state
-      if (avatarPreview) {
-        // In a real app, the backend would return a new URL
-        // For now, we'll just update it to the preview URL for demonstration
-        setUserInfo((prev) => ({ ...prev, avatarUrl: avatarPreview }));
-      }
-
-      setIsLoading(false);
-      setIsEditing(false);
-      setAvatarPreview(null);
-      alert("Profile updated successfully!");
-    }, 1500);
+    if (avatarFile) {
+      dataToSubmit.append("profilePicture", avatarFile);
+    }
+    dispatch(updateUserProfile(dataToSubmit));
   };
+
+  const isLoading = actionStatus === "loading";
+
+  if (!userInfo) {
+    return (
+      <div className="flex justify-center items-center h-full">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
@@ -109,10 +146,7 @@ export default function SupplierProfilePage() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => {
-                setFormData(userInfo); // Ensure form starts with current data
-                setIsEditing(true);
-              }}
+              onClick={() => setIsEditing(true)}
             >
               <Edit className="mr-2 h-4 w-4" /> Edit Profile
             </Button>
@@ -123,7 +157,7 @@ export default function SupplierProfilePage() {
             <div className="relative">
               <Avatar className="h-24 w-24 border">
                 <AvatarImage
-                  src={avatarPreview || userInfo.avatarUrl}
+                  src={avatarPreview || userInfo.profilePicture?.url}
                   alt={userInfo.companyName}
                 />
                 <AvatarFallback className="text-3xl">
@@ -154,7 +188,7 @@ export default function SupplierProfilePage() {
               <Input
                 id="companyName"
                 name="companyName"
-                value={formData.companyName || ""}
+                value={formData.companyName}
                 onChange={handleInputChange}
                 disabled={!isEditing}
               />
@@ -163,19 +197,14 @@ export default function SupplierProfilePage() {
           <div className="grid gap-6 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="email">Contact Email (Cannot be changed)</Label>
-              <Input
-                id="email"
-                type="email"
-                value={userInfo.email || ""}
-                disabled
-              />
+              <Input id="email" type="email" value={userInfo.email} disabled />
             </div>
             <div className="space-y-2">
               <Label htmlFor="name">Contact Person</Label>
               <Input
                 id="name"
                 name="name"
-                value={formData.name || ""}
+                value={formData.name}
                 onChange={handleInputChange}
                 disabled={!isEditing}
               />
@@ -185,7 +214,7 @@ export default function SupplierProfilePage() {
               <Input
                 id="companyWebsite"
                 name="companyWebsite"
-                value={formData.companyWebsite || ""}
+                value={formData.companyWebsite}
                 onChange={handleInputChange}
                 disabled={!isEditing}
               />
@@ -195,7 +224,7 @@ export default function SupplierProfilePage() {
               <Input
                 id="companyAddress"
                 name="companyAddress"
-                value={formData.companyAddress || ""}
+                value={formData.companyAddress}
                 onChange={handleInputChange}
                 disabled={!isEditing}
               />

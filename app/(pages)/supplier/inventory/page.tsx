@@ -1,6 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useDispatch, useSelector } from "react-redux";
+import { AppDispatch, RootState } from "@/lib/store";
+import { toast } from "react-toastify";
+import {
+  fetchMyInventory,
+  deleteJewelry,
+  JewelryItem,
+} from "@/lib/features/jewelry/jewelrySlice";
 import {
   Table,
   TableBody,
@@ -9,196 +18,221 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, PackageSearch } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Plus, Eye, Edit, Trash2, MoreHorizontal, Loader2 } from "lucide-react";
 
-// --- DUMMY DATA ---
-const initialInventory = [
-  {
-    _id: "1",
-    stockId: "JWL-001",
-    shape: "Round",
-    carat: 1.02,
-    price: 12000,
-    availability: "Available",
-  },
-  {
-    _id: "2",
-    stockId: "JWL-002",
-    shape: "Princess",
-    carat: 0.75,
-    price: 6500,
-    availability: "Available",
-  },
-  {
-    _id: "3",
-    stockId: "JWL-003",
-    shape: "Cushion",
-    carat: 2.15,
-    price: 25000,
-    availability: "On Hold",
-  },
-  {
-    _id: "4",
-    stockId: "JWL-004",
-    shape: "Oval",
-    carat: 1.5,
-    price: 18500,
-    availability: "Sold",
-  },
-];
-// --- END OF DUMMY DATA ---
+const placeholderImage = "/placeholder-jewelry.jpg";
 
-type Diamond = (typeof initialInventory)[0];
+export default function MyInventoryPage() {
+  const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
 
-export default function SupplierInventoryListPage() {
-  const [inventoryList, setInventoryList] =
-    useState<Diamond[]>(initialInventory);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const {
+    myInventory,
+    listStatus,
+    error: listError,
+  } = useSelector((state: RootState) => state.jewelry);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<JewelryItem | null>(null);
 
-  // Helper to format price
-  const formatPrice = (price?: number) =>
-    price
-      ? new Intl.NumberFormat("en-IN", {
-          style: "currency",
-          currency: "INR",
-        }).format(price * 80)
-      : "N/A";
+  useEffect(() => {
+    dispatch(fetchMyInventory());
+  }, [dispatch]);
 
-  const handleStatusChange = (diamondId: string, newAvailability: string) => {
-    setUpdatingId(diamondId);
-    console.log(`Updating ${diamondId} to ${newAvailability}`);
-
-    // Simulate an API call
-    setTimeout(() => {
-      setInventoryList((prevList) =>
-        prevList.map((diamond) =>
-          diamond._id === diamondId
-            ? { ...diamond, availability: newAvailability }
-            : diamond
-        )
-      );
-      setUpdatingId(null);
-      alert("Status updated successfully!");
-    }, 1000);
+  const handleDelete = (item: JewelryItem) => {
+    setSelectedItem(item);
+    setDeleteDialogOpen(true);
   };
 
-  const getBadgeVariant = (availability: string) => {
-    switch (availability) {
-      case "Available":
-        return "default";
-      case "On Hold":
-        return "secondary";
-      case "Sold":
-        return "destructive";
-      default:
-        return "outline";
+  const confirmDelete = () => {
+    if (selectedItem) {
+      dispatch(deleteJewelry(selectedItem._id))
+        .unwrap()
+        .then(() => {
+          toast.success(`Item ${selectedItem.sku} has been deleted.`);
+        })
+        .catch((error) => {
+          toast.error(`Failed to delete: ${error}`);
+        });
+      setDeleteDialogOpen(false);
+      setSelectedItem(null);
     }
   };
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">My Inventory</h1>
-        <p className="text-gray-500 mt-1">
-          View and manage all the diamonds in your inventory.
-        </p>
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "Approved":
+        return (
+          <Badge variant="default" className="bg-green-500 text-white">
+            Approved
+          </Badge>
+        );
+      case "Pending":
+        return (
+          <Badge variant="secondary" className="bg-yellow-500 text-white">
+            Pending
+          </Badge>
+        );
+      case "Rejected":
+        return <Badge variant="destructive">Rejected</Badge>;
+      default:
+        return <Badge>{status}</Badge>;
+    }
+  };
+
+  if (listStatus === "loading") {
+    return (
+      <div className="flex justify-center items-center h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
+    );
+  }
+
+  if (listStatus === "failed") {
+    return (
+      <div className="text-center text-red-500 mt-10">Error: {listError}</div>
+    );
+  }
+
+  return (
+    <div className="p-4 md:p-6">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">My Inventory</h1>
+          <p className="text-gray-500">Total {myInventory.length} items</p>
+        </div>
+        <Button
+          onClick={() => router.push("/supplier/inventory/add")}
+          className="gap-2"
+        >
+          <Plus className="h-4 w-4" /> Add Jewelry
+        </Button>
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle>All Diamonds ({inventoryList.length})</CardTitle>
-          <CardDescription>
-            Change the availability status directly from the table.
-          </CardDescription>
+          <CardTitle>My Products</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Stock ID</TableHead>
-                <TableHead>Shape</TableHead>
-                <TableHead>Carat</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead className="w-[180px]">Availability</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {inventoryList.length > 0 ? (
-                inventoryList.map((diamond) => (
-                  <TableRow key={diamond._id}>
-                    <TableCell className="font-medium">
-                      {diamond.stockId}
-                    </TableCell>
-                    <TableCell>{diamond.shape}</TableCell>
-                    <TableCell>{diamond.carat?.toFixed(2)}</TableCell>
-                    <TableCell className="font-semibold">
-                      {formatPrice(diamond.price)}
+          {myInventory.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <h3 className="text-lg font-semibold">No Jewelry Found</h3>
+              <p className="text-sm mt-1">
+                Click Add Jewelry to list your first product.
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Image</TableHead>
+                  <TableHead>Details</TableHead>
+                  <TableHead>Price</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {myInventory.map((item) => (
+                  <TableRow key={item._id}>
+                    <TableCell>
+                      <img
+                        src={item.images?.[0] || placeholderImage}
+                        alt={item.name}
+                        width={50}
+                        height={50}
+                        className="rounded-md border object-cover aspect-square"
+                      />
                     </TableCell>
                     <TableCell>
-                      {updatingId === diamond._id ? (
-                        <div className="flex items-center justify-center h-9">
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                        </div>
-                      ) : (
-                        <Select
-                          value={diamond.availability}
-                          onValueChange={(newValue) =>
-                            handleStatusChange(diamond._id, newValue)
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue>
-                              <Badge
-                                variant={getBadgeVariant(diamond.availability)}
-                              >
-                                {diamond.availability}
-                              </Badge>
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Available">Available</SelectItem>
-                            <SelectItem value="On Hold">On Hold</SelectItem>
-                            <SelectItem value="Sold">Sold</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
+                      <div className="font-medium">{item.name}</div>
+                      <div className="text-sm text-gray-500">
+                        SKU: {item.sku}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-bold">
+                        {new Intl.NumberFormat("en-IN", {
+                          style: "currency",
+                          currency: "INR",
+                        }).format(item.price)}
+                      </div>
+                    </TableCell>
+                    <TableCell>{getStatusBadge(item.status)}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => router.push(`/products/${item._id}`)}
+                          >
+                            <Eye className="h-4 w-4 mr-2" /> View
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              router.push(
+                                `/supplier/inventory/edit/${item._id}`
+                              )
+                            }
+                          >
+                            <Edit className="h-4 w-4 mr-2" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleDelete(item)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="h-48 text-center text-gray-500"
-                  >
-                    <div className="flex flex-col items-center gap-4">
-                      <PackageSearch className="h-12 w-12 text-gray-300" />
-                      <p className="font-medium">No diamonds found</p>
-                      <p className="text-sm">
-                        Your inventory is empty. Start by adding a new diamond.
-                      </p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action will permanently delete the item with SKU{" "}
+              <strong>{selectedItem?.sku}</strong>. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

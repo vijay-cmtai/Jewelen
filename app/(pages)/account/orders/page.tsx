@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useDispatch, useSelector } from "react-redux";
-import axios from "axios"; // <-- 1. IMPORT AXIOS
-import { toast } from "react-toastify"; // <-- 2. (Optional) IMPORT TOAST for feedback
+import axios from "axios";
+import { toast } from "react-toastify";
 import { AppDispatch, RootState } from "@/lib/store";
-import { fetchMyOrders, type Order } from "@/lib/features/orders/orderSlice";
+import { fetchMyOrders, type Order } from "@/lib/features/orders/orderSlice"; // cancelOrder thunk ko import karna hoga agar banaya hai
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,8 @@ import {
   ArrowRight,
   Download,
   Loader2,
-} from "lucide-react"; // <-- 3. IMPORT ICONS
+  XCircle,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -37,21 +38,31 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
-// ... (getStatusVariant and formatPrice helpers are unchanged)
 const getStatusVariant = (
   status: string
-): "success" | "default" | "secondary" | "destructive" | "outline" => {
-  switch (status?.toLowerCase()) {
-    case "completed":
-    case "delivered":
-      return "success";
-    case "shipped":
+): "default" | "secondary" | "destructive" | "outline" => {
+  switch (status) {
+    case "Completed":
+    case "Delivered":
       return "default";
-    case "processing":
+    case "Pending":
+    case "Processing":
+    case "Shipped":
       return "secondary";
-    case "cancelled":
-    case "failed":
+    case "Cancelled":
+    case "Failed":
       return "destructive";
     default:
       return "outline";
@@ -68,17 +79,16 @@ const formatPrice = (price: number | null | undefined) => {
 
 export default function UserOrdersPage() {
   const dispatch = useDispatch<AppDispatch>();
-
   const {
     data: myOrders,
     status,
     error,
   } = useSelector((state: RootState) => state.orders.myOrders);
-  const { userInfo } = useSelector((state: RootState) => state.user); // <-- 4. GET USERINFO FOR TOKEN
+  const { userInfo } = useSelector((state: RootState) => state.user);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [isDownloading, setIsDownloading] = useState<string | null>(null); // <-- 5. STATE TO TRACK DOWNLOADS
+  const [isDownloading, setIsDownloading] = useState<string | null>(null);
 
   useEffect(() => {
     dispatch(fetchMyOrders());
@@ -97,43 +107,52 @@ export default function UserOrdersPage() {
     });
   }, [myOrders, searchTerm, statusFilter]);
 
-  // ==========================================================
-  // ========= 6. NEW INVOICE DOWNLOAD HANDLER ================
-  // ==========================================================
   const handleDownloadInvoice = async (orderId: string) => {
     if (!orderId || !userInfo?.token) {
-      toast.error(
-        "Could not download invoice. Order ID or user token missing."
-      );
+      toast.error("Could not download invoice. User token missing.");
       return;
     }
 
-    setIsDownloading(orderId); // Set the ID of the order being downloaded
+    setIsDownloading(orderId);
     try {
       const config = {
         headers: { Authorization: `Bearer ${userInfo.token}` },
         responseType: "blob",
       };
-
       const { data } = await axios.get(
         `${process.env.NEXT_PUBLIC_API_URL}/orders/${orderId}/invoice`,
         config
       );
-
       const url = window.URL.createObjectURL(new Blob([data]));
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute("download", `invoice-${orderId}.pdf`);
       document.body.appendChild(link);
       link.click();
-
       link.parentNode?.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Invoice download failed:", error);
-      toast.error("Failed to download invoice. Please try again.");
+      toast.error("Failed to download invoice.");
     } finally {
-      setIsDownloading(null); // Reset download state
+      setIsDownloading(null);
+    }
+  };
+
+  const handleCancelOrder = async (orderId: string) => {
+    // NOTE: Yeh maan kar chal rahe hain ki aapne slice mein `cancelOrder` thunk banaya hoga
+    // Agar nahi, to aapko ise banana padega. Main yahan direct API call kar raha hu.
+    try {
+      const token = userInfo?.token;
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/orders/${orderId}/cancel`,
+        {},
+        config
+      );
+      toast.success("Order has been cancelled successfully.");
+      dispatch(fetchMyOrders()); // Refresh the orders list
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to cancel order.");
     }
   };
 
@@ -153,6 +172,7 @@ export default function UserOrdersPage() {
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
+          {/* Item List */}
           <div className="space-y-4">
             <h4 className="font-semibold">Items</h4>
             <ul className="space-y-3">
@@ -183,6 +203,7 @@ export default function UserOrdersPage() {
             </ul>
           </div>
           <Separator />
+          {/* Summary */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <h4 className="font-semibold">Total Amount</h4>
@@ -192,14 +213,16 @@ export default function UserOrdersPage() {
             </div>
             <div>
               <h4 className="font-semibold">Status</h4>
-              <Badge className="capitalize">{order.orderStatus}</Badge>
+              <Badge
+                variant={getStatusVariant(order.orderStatus)}
+                className="capitalize"
+              >
+                {order.orderStatus}
+              </Badge>
             </div>
           </div>
         </div>
-        <DialogFooter className="sm:justify-between gap-2">
-          {/* ============================================== */}
-          {/* ========= 7. ADD DOWNLOAD BUTTON HERE ======== */}
-          {/* ============================================== */}
+        <DialogFooter className="sm:justify-between gap-2 flex-wrap">
           <Button
             type="button"
             variant="outline"
@@ -211,8 +234,36 @@ export default function UserOrdersPage() {
             ) : (
               <Download className="mr-2 h-4 w-4" />
             )}
-            Download Invoice
+            Invoice
           </Button>
+          {/* Cancel Order Button with Confirmation */}
+          {order.orderStatus === "Processing" ||
+          order.orderStatus === "Pending" ? (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button type="button" variant="destructive">
+                  <XCircle className="mr-2 h-4 w-4" /> Cancel Order
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will cancel the entire order. This action cannot be
+                    undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Go Back</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => handleCancelOrder(order._id)}
+                  >
+                    Yes, Cancel Order
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : null}
           <DialogClose asChild>
             <Button type="button" variant="secondary">
               Close
@@ -235,7 +286,10 @@ export default function UserOrdersPage() {
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <Badge className="capitalize text-xs py-1 px-2.5">
+          <Badge
+            variant={getStatusVariant(order.orderStatus)}
+            className="capitalize text-xs py-1 px-2.5"
+          >
             {order.orderStatus}
           </Badge>
           <OrderDetailModal order={order} />
@@ -334,7 +388,7 @@ export default function UserOrdersPage() {
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
               <SelectItem value="shipped">Shipped</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="delivered">Delivered</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
@@ -344,7 +398,6 @@ export default function UserOrdersPage() {
       <div className="space-y-4">
         {status === "loading" ? (
           <>
-            <OrderCardSkeleton />
             <OrderCardSkeleton />
             <OrderCardSkeleton />
           </>
