@@ -53,6 +53,10 @@ export default function MyInventoryPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<JewelryItem | null>(null);
 
+  // Modal wale states ki ab zaroorat nahi hai, unhe hata dein
+  // const [editModalOpen, setEditModalOpen] = useState(false);
+  // const [itemToEdit, setItemToEdit] = useState<JewelryItem | null>(null);
+
   useEffect(() => {
     dispatch(fetchMyInventory());
   }, [dispatch]);
@@ -185,11 +189,15 @@ export default function MyInventoryPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          {/* === VIEW LINK THEEK KAREIN === */}
                           <DropdownMenuItem
-                            onClick={() => router.push(`/products/${item._id}`)}
+                            onClick={() =>
+                              router.push(`/supplier/inventory/${item._id}`)
+                            }
                           >
                             <Eye className="h-4 w-4 mr-2" /> View
                           </DropdownMenuItem>
+                          {/* === EDIT LINK THEEK KAREIN === */}
                           <DropdownMenuItem
                             onClick={() =>
                               router.push(
@@ -215,6 +223,8 @@ export default function MyInventoryPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal wale component ko bhi yahan se hata dein */}
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>

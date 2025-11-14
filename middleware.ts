@@ -1,16 +1,7 @@
-// File: middleware.ts (पूरा कोड)
-
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
-  const publicPages = [
-    "/signin",
-    "/signup",
-    "/forgot-password",
-    "/reset-password",
-  ];
-  const { pathname } = request.nextUrl;
   const cookie = request.cookies.get("userInfo");
   const userInfoToken = cookie?.value;
 
@@ -26,18 +17,25 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  const isPublicPage = publicPages.some((page) => pathname.startsWith(page));
+  const { pathname } = request.nextUrl;
+
   const isAdminRoute = pathname.startsWith("/admin");
   const isSupplierRoute = pathname.startsWith("/supplier");
+  const isUserProtectedRoute = ["/profile", "/my-orders", "/checkout"].some(
+    (path) => pathname.startsWith(path)
+  );
+
+  const isProtectedRoute =
+    isAdminRoute || isSupplierRoute || isUserProtectedRoute;
 
   if (!userRole) {
-    if (!isPublicPage) {
+    if (isProtectedRoute) {
       const signInUrl = new URL("/signin", request.url);
       signInUrl.searchParams.set("redirect", pathname);
       return NextResponse.redirect(signInUrl);
     }
   } else {
-    if (isPublicPage) {
+    if (pathname.startsWith("/signin") || pathname.startsWith("/signup")) {
       if (userRole === "Admin") {
         return NextResponse.redirect(new URL("/admin/dashboard", request.url));
       }
@@ -61,5 +59,14 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/admin/:path*",
+    "/supplier/:path*",
+    "/profile/:path*",
+    "/my-orders/:path*",
+    "/checkout/:path*",
+    "/signin",
+    "/signup",
+    "/accoount/:path*"
+  ],
 };
